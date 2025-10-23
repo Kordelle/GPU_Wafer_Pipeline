@@ -12,10 +12,13 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy application code
-COPY generate_data.py .
+COPY generate_data_enhanced.py .
+COPY explore_distributions.py .
 
 # Create output directory
 RUN mkdir /output
 
 # Run the script when container starts
-CMD ["python", "generate_data.py"]
+ENTRYPOINT ["python", "generate_data_enhanced.py"]
+CMD ["--mode", "batch", "--records", "1000"]
+

@@ -1,0 +1,49 @@
+services:
+  # Service 1: MinIO (S3-compatible object storage)
+  minio:
+    image: minio/minio:latest
+    container_name: manufacturing-minio
+    ports:
+      - "9000:9000"   # API endpoint
+      - "9001:9001"   # Web UI
+    environment:
+      MINIO_ROOT_USER: admin
+      MINIO_ROOT_PASSWORD: password123
+    volumes:
+      - minio-data:/data
+    command: server /data --console-address ":9001"
+    networks:
+      - manufacturing-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 30s
+      timeout: 20s
+      retries: 3
+
+  # Service 2: Data Generator
+  data-generator:
+    build:
+      context: ./data-generator
+      dockerfile: Dockerfile
+    container_name: manufacturing-generator
+    depends_on:
+      - minio
+    environment:
+      MINIO_ENDPOINT: minio:9000
+      MINIO_ACCESS_KEY: ${MINIO_ROOT_USER}
+      MINIO_SECRET_KEY: ${MINIO_ROOT_PASSWORD}
+    volumes:
+      - ./data-generator/output:/output
+    networks:
+      - manufacturing-network
+    # Don't run automatically -trigger manually
+    command: ["--mode", "batch", "--records", "10000"]
+
+# Shared network for container communication
+networks:
+  manufacturing-network:
+    driver: bridge
+
+# Persistent storage
+volumes:
+  minio-data:

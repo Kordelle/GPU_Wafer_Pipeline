@@ -1,2 +1,3 @@
 data-generator/output/generator.log
 data-generator/output/wafer_data.json
+.env

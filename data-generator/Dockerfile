@@ -14,11 +14,11 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy application code
 COPY generate_data_enhanced.py .
 COPY explore_distributions.py .
+COPY upload_to_minio.py .
 
 # Create output directory
 RUN mkdir /output
 
-# Run the script when container starts
-ENTRYPOINT ["python", "generate_data_enhanced.py"]
-CMD ["--mode", "batch", "--records", "1000"]
+
+CMD ["python", "generate_data_enhanced.py", "--mode", "batch", "--records", "1000"]
 

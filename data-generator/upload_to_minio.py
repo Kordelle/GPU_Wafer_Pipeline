@@ -27,8 +27,8 @@ def upload_to_minio(
     # Initialize MinIO client
     client = Minio(
         endpoint=os.getenv("MINIO_ENDPOINT", "localhost:9000"),
-        access_key=os.getenv("MINIO_ACCESS_KEY", "admin"),
-        secret_key=os.getenv("MINIO_SECRET_KEY", "password123"),
+        access_key=os.getenv("MINIO_ROOT_USER"),  
+        secret_key=os.getenv("MINIO_ROOT_PASSWORD"),  
         secure=False  # Use HTTP (not HTTPS) for local
     )
     

@@ -36,3 +36,5 @@ def generate_wafer_data(num_records=1000):
 
 if __name__ == "__main__":
     generate_wafer_data(1000)
+    
+    

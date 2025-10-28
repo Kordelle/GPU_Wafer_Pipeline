@@ -23,6 +23,7 @@ COPY generate_data_enhanced.py .
 COPY explore_distributions.py .
 COPY upload_to_minio.py .
 COPY kafka_producer.py .
+COPY kafka_consumer.py .
 
 # Create output directory
 RUN mkdir /output

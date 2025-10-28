@@ -280,7 +280,7 @@ docker run -v ${PWD}/output:/output nvidia-data-pipeline:latest \
 
 ## Docker Usage
 
-### Build Custom Image
+### Build Custom Image 
 
 ```bash
 docker build -t nvidia-data-pipeline:v1.0 .
@@ -370,7 +370,7 @@ GPU_Wafer_Pipeline/
 - [x] CLI interface
 
 ### Phase 2: Data Pipeline (In Progress)
-- [ ] Apache Kafka integration for streaming
+- [x] Apache Kafka integration for streaming
 - [ ] Apache Spark for batch processing
 - [ ] Time-series database storage (InfluxDB)
 - [ ] Data quality monitoring
@@ -446,7 +446,9 @@ python generate_data_enhanced.py --mode batch --records 1000
 
 ## License
 
-TBD
+MIT License
+
+Copyright (c) 2025 Kordelle
 
 ---
 

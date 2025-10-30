@@ -1,14 +1,91 @@
 services:
-  # Service 1: MinIO (S3-compatible object storage)
+  # ==========================================
+  # ZOOKEEPER (Kafka Dependency)
+  # ==========================================
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.5.0
+    container_name: manufacturing-zookeeper
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+    ports:
+      - "2181:2181"
+    networks:
+      - manufacturing-network
+    healthcheck:
+      test: ["CMD", "nc", "-z", "localhost", "2181"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ==========================================
+  # KAFKA BROKER
+  # ==========================================
+  kafka:
+    image: confluentinc/cp-kafka:7.5.0
+    container_name: manufacturing-kafka
+    depends_on:
+      zookeeper:
+        condition: service_healthy
+    ports:
+      - "9092:9092"
+      - "29092:29092"
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      
+      # Listener configuration 
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:29092,PLAINTEXT_HOST://localhost:9092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      
+      # Performance & retention settings
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_LOG_RETENTION_HOURS: 168  # 7 days
+      KAFKA_LOG_SEGMENT_BYTES: 1073741824  # 1GB
+      
+      # Auto-create topics (dev only!)
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+    networks:
+      - manufacturing-network
+    healthcheck:
+      test: ["CMD", "kafka-broker-api-versions", "--bootstrap-server", "localhost:9092"]
+      interval: 10s
+      timeout: 10s
+      retries: 5
+
+  # ==========================================
+  # KAFKA UI (Visualization)
+  # ==========================================
+  kafka-ui:
+    image: provectuslabs/kafka-ui:latest
+    container_name: manufacturing-kafka-ui
+    depends_on:
+      kafka:
+        condition: service_healthy
+    ports:
+      - "8080:8080"
+    environment:
+      KAFKA_CLUSTERS_0_NAME: manufacturing-cluster
+      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:29092
+      KAFKA_CLUSTERS_0_ZOOKEEPER: zookeeper:2181
+    networks:
+      - manufacturing-network
+
+  # ==========================================
+  # MINIO (S3 Storage)
+  # ==========================================
   minio:
     image: minio/minio:latest
     container_name: manufacturing-minio
     ports:
-      - "9000:9000"   # API endpoint
-      - "9001:9001"   # Web UI
+      - "9000:9000"
+      - "9001:9001"
     environment:
-      MINIO_ROOT_USER: admin
-      MINIO_ROOT_PASSWORD: password123
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
     volumes:
       - minio-data:/data
     command: server /data --console-address ":9001"
@@ -20,30 +97,39 @@ services:
       timeout: 20s
       retries: 3
 
-  # Service 2: Data Generator
+  # ==========================================
+  # DATA GENERATOR
+  # ==========================================
   data-generator:
     build:
       context: ./data-generator
       dockerfile: Dockerfile
     container_name: manufacturing-generator
     depends_on:
-      - minio
+      kafka:
+        condition: service_healthy
+      minio:
+        condition: service_started
     environment:
+      # Kafka config (from .env)
+      KAFKA_BOOTSTRAP_SERVERS: ${KAFKA_BOOTSTRAP_SERVERS:-kafka:29092}
+      KAFKA_TOPIC: ${KAFKA_TOPIC:-wafer-telemetry}
+      
+      # MinIO config (from .env)
       MINIO_ENDPOINT: minio:9000
-      MINIO_ACCESS_KEY: ${MINIO_ROOT_USER}
-      MINIO_SECRET_KEY: ${MINIO_ROOT_PASSWORD}
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
     volumes:
       - ./data-generator/output:/output
     networks:
       - manufacturing-network
-    # Don't run automatically -trigger manually
-    command: ["--mode", "batch", "--records", "10000"]
 
-# Shared network for container communication
+# ==========================================
+# NETWORKING & VOLUMES
+# ==========================================
 networks:
   manufacturing-network:
     driver: bridge
 
-# Persistent storage
 volumes:
   minio-data:

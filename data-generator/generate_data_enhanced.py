@@ -15,6 +15,7 @@ import time
 from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Dict, List
+from kafka_producer import ManufacturingKafkaProducer
 
 import numpy as np
 import pandas as pd
@@ -268,6 +269,58 @@ class ManufacturingDataGenerator:
                 
         except KeyboardInterrupt:
             logger.info(f"\n✅ Streaming stopped after {wafer_id} wafers")
+    
+    def stream_to_kafka(
+        self,
+        interval_seconds: float = 1.0,
+        topic: str = None
+    ):
+                """
+                Stream data continuously to Kafka (real-time telemetry simulation)
+                
+                Args:
+                    interval_seconds: Time between records
+                    topic: Kafka topic (uses env var if not provided)
+                """
+                logger.info(f"Starting Kafka streaming mode: 1 record every {interval_seconds}s")
+                logger.info("Press Ctrl+C to stop")
+                
+                # Initialize Kafka producer
+                producer = ManufacturingKafkaProducer(topic=topic)
+                
+                wafer_id = 0
+                
+                try:
+                    while True:
+                        # Generate single record
+                        df = self.generate_batch(1, start_id=wafer_id)
+                        record = df.iloc[0].to_dict()
+                        
+                        # Convert timestamp to ISO format (JSON serializable)
+                        record['timestamp'] = record['timestamp'].isoformat()
+                        
+                        # Send to Kafka
+                        producer.send_wafer_telemetry(record)
+                        
+                        # Log to console (for monitoring)
+                        logger.info(
+                            f"📡 Streamed {record['wafer_id']} | "
+                            f"Equipment: {record['equipment_id']} | "
+                            f"Temp: {record['temperature_c']:.1f}°C | "
+                            f"Yield: {record['yield_rate']:.2%} | "
+                            f"Defects: {record['defect_count']} | "
+                            f"Anomaly: {record['is_anomaly']}"
+                        )
+                        
+                        wafer_id += 1
+                        time.sleep(interval_seconds)
+                        
+                except KeyboardInterrupt:
+                    logger.info(f"\n✅ Streaming stopped after {wafer_id} wafers")
+                    stats = producer.get_stats()
+                    logger.info(f"📊 Final stats: {stats['messages_sent']} sent, {stats['messages_failed']} failed")
+                finally:
+                    producer.close()
 
 
 def main():
@@ -278,7 +331,7 @@ def main():
     
     parser.add_argument(
         '--mode',
-        choices=['batch', 'large', 'stream'],
+        choices=['batch', 'large', 'stream', 'kafka'],
         default='batch',
         help='Generation mode'
     )
@@ -298,12 +351,17 @@ def main():
         '--interval',
         type=float,
         default=1.0,
-        help='Seconds between records (stream mode)'
+        help='Seconds between records (stream/kafka mode)'
     )
     parser.add_argument(
         '--output',
         default='/output/wafer_data.json',
-        help='Output file path'
+        help='Output file path (batch/large/stream mode)'
+    )
+    parser.add_argument(
+        '--topic',
+        default=None,
+        help='Kafka topic (kafka mode, uses env var if not provided)'
     )
     parser.add_argument(
         '--anomaly-rate',
@@ -349,6 +407,12 @@ def main():
         generator.stream_data(
             interval_seconds=args.interval,
             output_path=args.output
+        )
+    
+    elif args.mode == 'kafka':  
+        generator.stream_to_kafka(
+            interval_seconds=args.interval,
+            topic=args.topic
         )
 
 

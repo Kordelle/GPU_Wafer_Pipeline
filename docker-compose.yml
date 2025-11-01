@@ -13,6 +13,7 @@ services:
     networks:
       - manufacturing-network
     healthcheck:
+
       test: ["CMD", "nc", "-z", "localhost", "2181"]
       interval: 10s
       timeout: 5s
@@ -96,6 +97,75 @@ services:
       interval: 30s
       timeout: 20s
       retries: 3
+
+  # ============================================
+  # SPARK PROCESSING ENGINE
+  # ============================================
+  spark-master:
+    image: apache/spark:4.0.0
+    container_name: manufacturing-spark-master
+    hostname: spark-master
+    command: >
+      /opt/spark/bin/spark-class org.apache.spark.deploy.master.Master
+      --host spark-master
+      --port 7077
+      --webui-port 8082
+    ports:
+      - "7077:7077"   # Spark master port
+      - "8082:8082"   # Spark master UI
+    volumes:
+      - ./spark-jobs:/opt/spark-jobs
+      - ./minio-data:/data
+    networks:
+      - manufacturing-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8082"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+  spark-worker:
+    image: apache/spark:4.0.0
+    container_name: manufacturing-spark-worker
+    hostname: spark-worker
+    command: >
+      /opt/spark/bin/spark-class org.apache.spark.deploy.worker.Worker
+      spark://spark-master:7077
+      --cores 2
+      --memory 2g
+      --webui-port 8083
+    ports:
+      - "8083:8083"   # Spark worker UI
+    volumes:
+      - ./spark-jobs:/opt/spark-jobs
+      - ./minio-data:/data
+    networks:
+      - manufacturing-network
+    depends_on:
+      spark-master:
+        condition: service_healthy
+
+  # PySpark Jupyter Notebook (for interactive development)
+  spark-notebook:
+    image: jupyter/pyspark-notebook:python-3.10
+    container_name: manufacturing-spark-notebook
+    user: root  # Needed for volume permissions
+    environment:
+      - JUPYTER_ENABLE_LAB=yes
+      - GRANT_SUDO=yes
+      - CHOWN_HOME=yes
+      - CHOWN_HOME_OPTS=-R
+    ports:
+      - "8888:8888"   # Jupyter Lab
+    volumes:
+      - ./notebooks:/home/jovyan/work
+      - ./minio-data:/data
+    networks:
+      - manufacturing-network
+    depends_on:
+      - spark-master
+
 
   # ==========================================
   # DATA GENERATOR

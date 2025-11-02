@@ -371,7 +371,7 @@ GPU_Wafer_Pipeline/
 
 ### Phase 2: Data Pipeline (In Progress)
 - [x] Apache Kafka integration for streaming
-- [ ] Apache Spark for batch processing
+- [x] Apache Spark for batch processing
 - [ ] Time-series database storage (InfluxDB)
 - [ ] Data quality monitoring
 - [ ] Schema validation (Avro/Protobuf)

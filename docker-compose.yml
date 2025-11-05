@@ -129,6 +129,8 @@ services:
       - ./data-generator/output:/output
     networks:
       - manufacturing-network
+    # Run both producer (generates data) and consumer (writes to MinIO)
+    command: sh -c "python kafka_producer.py & python kafka_consumer.py"
 
 # ==========================================
 # NETWORKING & VOLUMES
@@ -137,7 +139,3 @@ networks:
   manufacturing-network:
     driver: bridge
     name: manufacturing-network
-
-volumes:
-  minio-data:
-    name: manufacturing-minio-data

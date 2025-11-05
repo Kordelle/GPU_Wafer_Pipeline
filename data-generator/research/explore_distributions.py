@@ -111,7 +111,7 @@ def visualize_distributions():
 
     plt.tight_layout()
     plt.savefig('/output/distribution_analysis.png', dpi=300, bbox_inches='tight')
-    print("✅ Saved visualization to /output/distribution_analysis.png")
+    print("Saved visualization to /output/distribution_analysis.png")
     
     # Print statistics
     print("\n" + "="*60)
@@ -195,5 +195,5 @@ if __name__ == "__main__":
     visualize_distributions()
     demonstrate_anomaly_detection()
     
-    print("\n✅ Analysis complete! Check /output/distribution_analysis.png")
+    print("\nAnalysis complete! Check /output/distribution_analysis.png")
     

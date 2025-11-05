@@ -344,21 +344,17 @@ optional arguments:
 ## Project Structure
 
 ```
-GPU_Wafer_Pipeline/
-├── README.md                          # This file
-├── data-generator/
-│   ├── Dockerfile                     # Container configuration
-│   ├── requirements.txt               # Python dependencies
-│   ├── generate_data_enhanced.py      # Main data generator
-│   ├── generate_data.py               # Legacy simple generator
-│   ├── explore_distributions.py       # Statistical analysis tool
-│   └── output/                        # Generated data directory
-│       ├── wafer_data.json           # Sample output
-│       └── generator.log             # Runtime logs
-└── docs/                             # (Future) Documentation
+Semiconductor-Telemetry-Platform/
+├── data-generator/          # Production streaming pipeline
+│   ├── kafka_producer.py    # Generates wafer telemetry
+│   ├── kafka_consumer.py    # Writes to MinIO
+│   └── generate_data_enhanced.py
+│
+├── notebooks/               # Research & analysis
+│   └── explore_distributions.py
+│
+└── docker-compose.yml       # Infrastructure definition
 ```
-
----
 
 ## Roadmap
 
@@ -417,7 +413,7 @@ GPU_Wafer_Pipeline/
 2024-10-24 15:30:52,341 - __main__ - INFO - Batch 1: 1,000,000 records | Progress: 10.0% | Rate: 81,300 rec/sec
 2024-10-24 15:31:04,562 - __main__ - INFO - Batch 2: 1,000,000 records | Progress: 20.0% | Rate: 82,150 rec/sec
 ...
-2024-10-24 15:32:18,789 - __main__ - INFO - ✅ Generated 10,000,000 records in 98.67s
+2024-10-24 15:32:18,789 - __main__ - INFO - Generated 10,000,000 records in 98.67s
 2024-10-24 15:32:18,790 - __main__ - INFO -    Average rate: 101,347 records/sec
 2024-10-24 15:32:18,791 - __main__ - INFO -    File size: 1,234.56 MB
 ```
@@ -440,10 +436,10 @@ This project uses specific technologies for local development and learning purpo
 ### Why These Choices Matter
 
 **Local Development:**
-- ✅ Zero cloud costs during development
-- ✅ Full stack runs on laptop (no internet required)
-- ✅ Easy debugging and troubleshooting
-- ✅ Learn infrastructure concepts hands-on
+- Zero cloud costs during development
+- Full stack runs on laptop (no internet required)
+- Easy debugging and troubleshooting
+- Learn infrastructure concepts hands-on
 
 **Production Migration Path:**
 - Each component has a clear cloud-native alternative

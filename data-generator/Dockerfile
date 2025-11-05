@@ -1,5 +1,3 @@
-# Start from official Python image
-
 FROM python:3.11-slim
 
 # Install system dependencies for Snappy compression
@@ -7,6 +5,8 @@ RUN apt-get update && apt-get install -y \
     gcc \
     g++ \
     libsnappy-dev \
+    bash \
+    curl \
     && rm -rf /var/lib/apt/lists/*
 
 # Set working directory inside container
@@ -18,16 +18,13 @@ COPY requirements.txt .
 # Install dependencies
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy application code
+# Copy only production application code
 COPY generate_data_enhanced.py .
-COPY explore_distributions.py .
-COPY upload_to_minio.py .
 COPY kafka_producer.py .
 COPY kafka_consumer.py .
 
-# Create output directory
-RUN mkdir /output
+# Create output directory (not used in streaming mode, but keeps compatibility)
+RUN mkdir -p /output
 
-
-CMD ["python", "generate_data_enhanced.py", "--mode", "batch", "--records", "1000"]
-
+# Start both producer and consumer
+CMD ["sh", "-c", "python kafka_producer.py & python kafka_consumer.py"]

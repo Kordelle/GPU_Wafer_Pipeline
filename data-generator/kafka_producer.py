@@ -102,7 +102,7 @@ class ManufacturingKafkaProducer:
                     api_version=(2, 5, 0)
                 )
                 
-                logger.info("✅ Connected to Kafka broker")
+                logger.info("Connected to Kafka broker")
                 return producer
                 
             except NoBrokersAvailable:
@@ -153,8 +153,8 @@ class ManufacturingKafkaProducer:
             )
             
             # Add callback for delivery confirmation
-            future.add_callback(self._on_send_success, wafer_data)
-            future.add_errback(self._on_send_error, wafer_data)
+            future.add_callback(lambda metadata: self._on_send_success(metadata, wafer_data))
+            future.add_errback(lambda exc: self._on_send_error(exc, wafer_data))
             
             return True
             
@@ -181,7 +181,7 @@ class ManufacturingKafkaProducer:
         """Callback for failed message delivery"""
         self.messages_failed += 1
         logger.error(
-            f"❌ Failed to send wafer {wafer_data.get('wafer_id', 'unknown')}: {exception}"
+            f"Failed to send wafer {wafer_data.get('wafer_id', 'unknown')}: {exception}"
         )
     
     def flush(self, timeout: int = 30):
@@ -193,14 +193,14 @@ class ManufacturingKafkaProducer:
         """
         logger.info("Flushing producer buffer...")
         self.producer.flush(timeout=timeout)
-        logger.info(f"✅ Flush complete. Sent: {self.messages_sent}, Failed: {self.messages_failed}")
+        logger.info(f"Flush complete. Sent: {self.messages_sent}, Failed: {self.messages_failed}")
     
     def close(self):
         """Close producer and cleanup resources"""
         logger.info("Closing Kafka producer...")
         self.flush()
         self.producer.close()
-        logger.info("✅ Producer closed")
+        logger.info("Producer closed")
     
     def get_stats(self) -> Dict[str, int]:
         """Get producer statistics"""
@@ -221,7 +221,7 @@ def main():
     from datetime import datetime
     
     parser = argparse.ArgumentParser(description="Test Kafka producer")
-    parser.add_argument("--messages", type=int, default=10, help="Number of test messages")
+    parser.add_argument("--messages", type=int, default=1000, help="Number of test messages")
     parser.add_argument("--topic", default="wafer-telemetry", help="Kafka topic")
     args = parser.parse_args()
     

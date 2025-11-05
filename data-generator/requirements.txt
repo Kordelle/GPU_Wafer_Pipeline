@@ -5,3 +5,5 @@ scipy==1.11.4
 minio==7.2.0
 kafka-python==2.0.2
 python-snappy==0.6.1
+pyarrow==14.0.1
+fastparquet==2023.10.1

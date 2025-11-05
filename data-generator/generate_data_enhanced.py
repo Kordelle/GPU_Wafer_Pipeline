@@ -227,7 +227,7 @@ class ManufacturingDataGenerator:
             del df
         
         total_time = time.time() - start_time
-        logger.info(f"✅ Generated {total_records:,} records in {total_time:.2f}s")
+        logger.info(f"Generated {total_records:,} records in {total_time:.2f}s")
         logger.info(f"   Average rate: {total_records/total_time:,.0f} records/sec")
         
         # File size
@@ -268,7 +268,7 @@ class ManufacturingDataGenerator:
                 time.sleep(interval_seconds)
                 
         except KeyboardInterrupt:
-            logger.info(f"\n✅ Streaming stopped after {wafer_id} wafers")
+            logger.info(f"\nStreaming stopped after {wafer_id} wafers")
     
     def stream_to_kafka(
         self,
@@ -316,7 +316,7 @@ class ManufacturingDataGenerator:
                         time.sleep(interval_seconds)
                         
                 except KeyboardInterrupt:
-                    logger.info(f"\n✅ Streaming stopped after {wafer_id} wafers")
+                    logger.info(f"\nStreaming stopped after {wafer_id} wafers")
                     stats = producer.get_stats()
                     logger.info(f"📊 Final stats: {stats['messages_sent']} sent, {stats['messages_failed']} failed")
                 finally:
@@ -389,7 +389,7 @@ def main():
         logger.info(f"Batch mode: Generating {args.records:,} records")
         df = generator.generate_batch(args.records)
         df.to_json(args.output, orient='records', lines=True)
-        logger.info(f"✅ Saved to {args.output}")
+        logger.info(f"Saved to {args.output}")
         
         # Print sample
         print("\n📊 Sample data:")

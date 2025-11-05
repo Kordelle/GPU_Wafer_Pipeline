@@ -1,19 +1,12 @@
-"""
-Kafka Consumer for Manufacturing Telemetry
-Consumes wafer data from Kafka and writes to MinIO for archival
-"""
-
 import json
 import logging
-import os
-import sys
-import time
 from typing import Dict, List
-from kafka import KafkaConsumer
-from kafka.errors import KafkaError
-from minio import Minio
 from datetime import datetime
 from io import BytesIO
+
+from kafka import KafkaConsumer
+from minio import Minio
+import pandas as pd
 
 logging.basicConfig(
     level=logging.INFO,
@@ -24,277 +17,206 @@ logger = logging.getLogger(__name__)
 
 class ManufacturingKafkaConsumer:
     """
-    Kafka consumer for archiving manufacturing telemetry to MinIO
-    
-    Features:
-    - Batch processing (efficiency)
-    - MinIO integration (object storage)
-    - Offset management (exactly-once processing)
-    - Error handling with retry logic
+    Kafka consumer that reads wafer telemetry and archives to MinIO
     """
     
     def __init__(
         self,
-        topic: str = None,
-        group_id: str = "minio-archiver",
-        batch_size: int = 1000,
-        poll_interval_ms: int = 10000
+        bootstrap_servers: str = "kafka:29092",
+        topic: str = "wafer-telemetry",
+        group_id: str = "manufacturing-consumer-group",
+        minio_endpoint: str = "minio:9000",
+        minio_access_key: str = "admin",
+        minio_secret_key: str = "password123",
+        batch_size: int = 100
     ):
         """
         Initialize Kafka consumer and MinIO client
-        
-        Args:
-            topic: Kafka topic to consume from
-            group_id: Consumer group identifier
-            batch_size: Number of messages to batch before writing
-            poll_interval_ms: Polling interval in milliseconds
         """
-        # Kafka config from environment
-        self.bootstrap_servers = os.getenv("KAFKA_BOOTSTRAP_SERVERS", "kafka:29092")
-        self.topic = topic or os.getenv("KAFKA_TOPIC", "wafer-telemetry")
-        self.group_id = group_id
+        self.bootstrap_servers = bootstrap_servers
+        self.topic = topic
         self.batch_size = batch_size
-        
-        # MinIO config from environment
-        self.minio_endpoint = os.getenv("MINIO_ENDPOINT", "minio:9000")
-        self.minio_user = os.getenv("MINIO_ROOT_USER")
-        self.minio_password = os.getenv("MINIO_ROOT_PASSWORD")
-        
-        # Stats tracking
-        self.messages_consumed = 0
+        self.buffer = []
         self.messages_written = 0
+        self.running = True
         
-        logger.info(f"Initializing Kafka consumer")
-        logger.info(f"  Topic: {self.topic}")
-        logger.info(f"  Group ID: {self.group_id}")
-        logger.info(f"  Batch size: {self.batch_size}")
-        
-        # Initialize consumer and MinIO client
-        self.consumer = self._create_consumer()
-        self.minio_client = self._create_minio_client()
-    
-    def _create_consumer(self) -> KafkaConsumer:
-        """Create and configure Kafka consumer"""
-        consumer = KafkaConsumer(
-            self.topic,
-            bootstrap_servers=self.bootstrap_servers.split(','),
-            group_id=self.group_id,
-            
-            # Deserialization
-            value_deserializer=lambda v: json.loads(v.decode('utf-8')),
-            key_deserializer=lambda k: k.decode('utf-8') if k else None,
-            
-            # Offset management
-            enable_auto_commit=False,  # Manual commit for exactly-once
-            auto_offset_reset='earliest',  # Start from beginning if no offset
-            
-            # Performance
-            max_poll_records=self.batch_size,
-            max_poll_interval_ms=300000,  # 5 minutes
-            session_timeout_ms=30000,  # 30 seconds
+        # Initialize Kafka consumer
+        logger.info(f"🔌 Connecting to Kafka: {bootstrap_servers}")
+        self.consumer = KafkaConsumer(
+            topic,
+            bootstrap_servers=bootstrap_servers,
+            group_id=group_id,
+            auto_offset_reset='earliest',
+            enable_auto_commit=False,
+            value_deserializer=lambda m: json.loads(m.decode('utf-8'))
         )
+        logger.info(f"Connected to Kafka topic: {topic}")
         
-        logger.info("✅ Connected to Kafka consumer")
-        return consumer
-    
-    def _create_minio_client(self) -> Minio:
-        """Create MinIO client for object storage"""
-        client = Minio(
-            endpoint=self.minio_endpoint,
-            access_key=self.minio_user,
-            secret_key=self.minio_password,
+        # Initialize MinIO client
+        logger.info(f"Connecting to MinIO: {minio_endpoint}")
+        self.minio_client = Minio(
+            minio_endpoint,
+            access_key=minio_access_key,
+            secret_key=minio_secret_key,
             secure=False
         )
         
-        # Ensure bucket exists
-        bucket_name = "manufacturing-data"
-        if not client.bucket_exists(bucket_name):
-            client.make_bucket(bucket_name)
-            logger.info(f"✅ Created MinIO bucket: {bucket_name}")
+        # Ensure bucket structure exists
+        self._ensure_bucket_structure()
         
-        return client
+        logger.info(f"Consumer initialized (batch_size={batch_size})")
     
-    def consume_and_archive(self):
+    def _ensure_bucket_structure(self):
         """
-        Main consumption loop: Poll Kafka → Validate → Batch → Write to MinIO
+        Ensure MinIO bucket exists
         """
-        logger.info("🚀 Starting consumer loop (press Ctrl+C to stop)")
-        
-        buffer = []
-        invalid_count = 0
+        bucket_name = "manufacturing-data"
         
         try:
-            while True:
-                # Poll for messages
-                messages = self.consumer.poll(timeout_ms=1000)
-                
-                # Process messages from all partitions
-                for topic_partition, records in messages.items():
-                    for record in records:
-                        self.messages_consumed += 1
-                        
-                        # Validate message
-                        if self._validate_message(record.value):
-                            buffer.append(record.value)
-                        else:
-                            invalid_count += 1
-                            logger.warning(
-                                f"⚠️  Invalid message (wafer_id: {record.value.get('wafer_id', 'unknown')})"
-                            )
-                
-                # Write batch to MinIO when buffer is full
-                if len(buffer) >= self.batch_size:
-                    self._write_batch_to_minio(buffer)
-                    buffer.clear()
-                    
-                    # Commit offset after successful write
-                    self.consumer.commit()
-                    
-                    logger.info(
-                        f"📊 Consumed: {self.messages_consumed} | "
-                        f"Valid: {self.messages_consumed - invalid_count} | "
-                        f"Invalid: {invalid_count} | "
-                        f"Batches written: {self.messages_written}"
-                    )
-        
-        except KeyboardInterrupt:
-            logger.info("\n⚠️  Shutting down consumer...")
+            if not self.minio_client.bucket_exists(bucket_name):
+                logger.info(f"Creating bucket: {bucket_name}")
+                self.minio_client.make_bucket(bucket_name)
+            else:
+                logger.info(f"Bucket exists: {bucket_name}")
             
-            # Write remaining buffered messages
-            if buffer:
-                self._write_batch_to_minio(buffer)
-                self.consumer.commit()
+            logger.info(f"Ready to write to: s3://{bucket_name}/bronze/wafer-telemetry/")
             
-            logger.info(f"✅ Final stats:")
-            logger.info(f"   Messages consumed: {self.messages_consumed}")
-            logger.info(f"   Valid messages: {self.messages_consumed - invalid_count}")
-            logger.info(f"   Invalid messages: {invalid_count}")
-            logger.info(f"   Batches written: {self.messages_written}")
-        
-        finally:
-            self.consumer.close()
-            logger.info("✅ Consumer closed")
+        except Exception as e:
+            logger.error(f"Failed to setup bucket: {e}")
+            raise
     
     def _write_batch_to_minio(self, batch: List[Dict]):
         """
-        Write batch of messages to MinIO as JSON file
-        
-        Args:
-            batch: List of message dictionaries
+        Write batch of messages to MinIO as Parquet file
         """
         if not batch:
             return
         
         try:
-            # Generate timestamped filename
+            # Convert to DataFrame
+            df = pd.DataFrame(batch)
+            
+            # Add timestamp processing
+            df['timestamp'] = pd.to_datetime(df['timestamp'])
+            
+            # Generate filename with timestamp
             timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-            filename = f"kafka_batch_{timestamp}_{len(batch)}_records.json"
+            date_str = datetime.now().strftime('%Y%m%d')
+            filename = f"kafka_batch_{timestamp}_{len(batch)}_records.parquet"
             
-            # Convert batch to JSON string
-            json_data = json.dumps(batch, indent=2)
-            json_bytes = json_data.encode('utf-8')
+            # Write Parquet to memory buffer
+            parquet_buffer = BytesIO()
+            df.to_parquet(
+                parquet_buffer,
+                engine='pyarrow',
+                compression='snappy',
+                index=False
+            )
+            parquet_buffer.seek(0)
             
-            # Create in-memory file object
-            data_stream = BytesIO(json_bytes)
-            
-            # Upload to MinIO
+            # Upload to MinIO with date partitioning
             bucket_name = "manufacturing-data"
-            object_name = f"bronze/wafer-telemetry/{timestamp[:8]}/{filename}"
+            object_name = f"bronze/wafer-telemetry/{date_str}/{filename}"
             
             self.minio_client.put_object(
                 bucket_name=bucket_name,
                 object_name=object_name,
-                data=data_stream,
-                length=len(json_bytes),
-                content_type='application/json'
+                data=parquet_buffer,
+                length=parquet_buffer.getbuffer().nbytes,
+                content_type='application/octet-stream'
             )
             
             self.messages_written += 1
             
             logger.info(
-                f"✅ Wrote batch to MinIO: s3://{bucket_name}/{object_name} "
-                f"({len(batch)} messages, {len(json_bytes) / 1024:.1f} KB)"
+                f"Wrote batch to MinIO: s3://{bucket_name}/{object_name} "
+                f"({len(batch)} messages, {parquet_buffer.getbuffer().nbytes / 1024:.1f} KB)"
             )
             
         except Exception as e:
-            logger.error(f"❌ Failed to write batch to MinIO: {e}")
-            raise  # Re-raise to prevent offset commit
+            logger.error(f"Failed to write batch to MinIO: {e}")
+            logger.exception(e)  # Print full stack trace
+            raise
     
-    def _validate_message(self, message: Dict) -> bool:
+    def consume_and_archive(self):
         """
-        Validate wafer telemetry message schema and ranges
-        
-        Args:
-            message: Message dictionary from Kafka
-            
-        Returns:
-            True if valid, False otherwise
+        Consume messages from Kafka and archive to MinIO in batches
         """
-        required_fields = [
-            'wafer_id', 'equipment_id', 'timestamp',
-            'temperature_c', 'pressure_torr', 'yield_rate', 'defect_count'
-        ]
+        logger.info(f"Starting consumer loop...")
+        logger.info(f"Batching {self.batch_size} messages before writing to MinIO")
         
-        # Check required fields exist
-        for field in required_fields:
-            if field not in message:
-                logger.warning(f"⚠️  Missing required field: {field}")
-                return False
-        
-        # Validate ranges (manufacturing process constraints)
         try:
-            temp = message['temperature_c']
-            pressure = message['pressure_torr']
-            yield_rate = message['yield_rate']
-            defect_count = message['defect_count']
-            
-            # Temperature: 300-400°C (with tolerance for anomalies)
-            if not (250 <= temp <= 450):
-                logger.warning(f"⚠️  Temperature out of range: {temp}°C")
-                return False
-            
-            # Pressure: 5-15 Torr (with tolerance)
-            if not (2 <= pressure <= 20):
-                logger.warning(f"⚠️  Pressure out of range: {pressure} Torr")
-                return False
-            
-            # Yield rate: 0-1 (percentage)
-            if not (0 <= yield_rate <= 1):
-                logger.warning(f"⚠️  Yield rate invalid: {yield_rate}")
-                return False
-            
-            # Defect count: non-negative integer
-            if defect_count < 0:
-                logger.warning(f"⚠️  Negative defect count: {defect_count}")
-                return False
-            
-            return True
-            
-        except (KeyError, TypeError, ValueError) as e:
-            logger.warning(f"⚠️  Validation error: {e}")
-            return False
-
-
-def main():
-    """CLI entry point for consumer"""
-    import argparse
+            for message in self.consumer:
+                if not self.running:
+                    break
+                
+                # Add message to buffer
+                self.buffer.append(message.value)
+                
+                # Write batch when buffer is full
+                if len(self.buffer) >= self.batch_size:
+                    logger.info(f"Received batch of {len(self.buffer)} messages")
+                    self._write_batch_to_minio(self.buffer)
+                    
+                    # Commit offset after successful write
+                    self.consumer.commit()
+                    
+                    # Clear buffer
+                    self.buffer.clear()
+                    
+                    logger.info(f"Total batches written: {self.messages_written}")
+        
+        except KeyboardInterrupt:
+            logger.info("Keyboard interrupt received")
+        except Exception as e:
+            logger.error(f"Consumer error: {e}")
+            logger.exception(e)
+        finally:
+            self.shutdown()
     
-    parser = argparse.ArgumentParser(description="Kafka consumer for manufacturing telemetry")
-    parser.add_argument("--topic", default="wafer-telemetry", help="Kafka topic")
-    parser.add_argument("--group-id", default="minio-archiver", help="Consumer group ID")
-    parser.add_argument("--batch-size", type=int, default=1000, help="Batch size")
-    
-    args = parser.parse_args()
-    
-    # Initialize and start consumer
-    consumer = ManufacturingKafkaConsumer(
-        topic=args.topic,
-        group_id=args.group_id,
-        batch_size=args.batch_size
-    )
-    
-    consumer.consume_and_archive()
+    def shutdown(self):
+        """
+        Graceful shutdown - write remaining buffer and close connections
+        """
+        logger.info("Shutting down consumer...")
+        
+        # Write remaining buffered messages
+        if self.buffer:
+            logger.info(f"Writing final batch of {len(self.buffer)} messages")
+            self._write_batch_to_minio(self.buffer)
+            self.consumer.commit()
+        
+        # Close consumer
+        self.consumer.close()
+        logger.info(f"Consumer shutdown complete. Total batches written: {self.messages_written}")
 
 
 if __name__ == "__main__":
-    main()
+    import os
+    
+    # Get config from environment variables
+    bootstrap_servers = os.getenv("KAFKA_BOOTSTRAP_SERVERS", "kafka:29092")
+    topic = os.getenv("KAFKA_TOPIC", "wafer-telemetry")
+    minio_endpoint = os.getenv("MINIO_ENDPOINT", "minio:9000")
+    minio_user = os.getenv("MINIO_ROOT_USER", "admin")
+    minio_password = os.getenv("MINIO_ROOT_PASSWORD", "password123")
+    
+    logger.info("=" * 60)
+    logger.info("KAFKA CONSUMER - Manufacturing Telemetry Archive")
+    logger.info("=" * 60)
+    logger.info(f"Kafka: {bootstrap_servers}")
+    logger.info(f"Topic: {topic}")
+    logger.info(f"MinIO: {minio_endpoint}")
+    logger.info("=" * 60)
+    
+    # Create and start consumer
+    consumer = ManufacturingKafkaConsumer(
+        bootstrap_servers=bootstrap_servers,
+        topic=topic,
+        minio_endpoint=minio_endpoint,
+        minio_access_key=minio_user,
+        minio_secret_key=minio_password,
+        batch_size=100
+    )
+    
+    consumer.consume_and_archive()

@@ -1,3 +1,43 @@
-data-generator/output/generator.log
-data-generator/output/wafer_data.json
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+ENV/
+*.egg-info/
+dist/
+build/
+output/
+
+# Data files
+*.json
+*.csv
+*.parquet
+*.snappy
+
+# MinIO persistent data (local storage)
+minio-data/
+
+# Docker volumes
+data-generator/output/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+# Environment variables 
 .env
+data-generator/research/distribution_analysis.png

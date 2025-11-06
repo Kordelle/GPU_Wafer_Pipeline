@@ -93,7 +93,7 @@ services:
       MINIO_ROOT_USER: ${MINIO_ROOT_USER}
       MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
     volumes:
-      - minio-data:/data
+      - ./minio-data:/data
     command: server /data --console-address ":9001"
     networks:
       - manufacturing-network

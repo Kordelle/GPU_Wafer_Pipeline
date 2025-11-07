@@ -439,7 +439,6 @@ This project uses specific technologies for local development and learning purpo
 - Zero cloud costs during development
 - Full stack runs on laptop (no internet required)
 - Easy debugging and troubleshooting
-- Learn infrastructure concepts hands-on
 
 **Production Migration Path:**
 - Each component has a clear cloud-native alternative

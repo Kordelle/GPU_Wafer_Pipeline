@@ -97,7 +97,7 @@ class ManufacturingKafkaConsumer:
             df = pd.DataFrame(batch)
             
             # Add timestamp processing
-            df['timestamp'] = pd.to_datetime(df['timestamp'])
+            df['timestamp'] = pd.to_datetime(df['timestamp'].dt.round('ms'))
             
             # Generate filename with timestamp
             timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')

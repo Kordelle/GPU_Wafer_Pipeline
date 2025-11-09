@@ -1,12 +1,9 @@
 import pandas as pd
 import pyarrow.parquet as pq
 import time
+from pathlib import Path
 
-kafka_batches = ['kafka_batch_20251106_035141_100_records.parquet', 'kafka_batch_20251106_035151_100_records.parquet',
-                 'kafka_batch_20251106_035201_100_records.parquet', 'kafka_batch_20251106_035211_100_records.parquet',
-                 'kafka_batch_20251106_035221_100_records.parquet']
-
-
+kafka_batches = [file.name for file in list(Path('../data-generator/output/').glob('kafka_batch_*.parquet'))]
 
 def summerize_parquet_files(kafka_batches, summary_type='head') -> None:
     for file in kafka_batches: 

@@ -102,7 +102,10 @@ class ManufacturingDataGenerator:
         
         # Generate timestamps (descending - newest first)
         base_time = datetime.now()
-        timestamps = [base_time - timedelta(seconds=x) for x in range(num_records)]
+        timestamps = [
+            (base_time - timedelta(seconds=x)).replace(microsecond=0)  # Zero out microseconds
+            for x in range(num_records)
+        ]
         
         # Generate wafer IDs
         wafer_ids = [f'W{str(i + start_id).zfill(8)}' for i in range(num_records)]

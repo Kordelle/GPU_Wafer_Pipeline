@@ -9,6 +9,7 @@ import sys
 from typing import Dict, Any, Optional
 from kafka import KafkaProducer
 from kafka.errors import KafkaError, NoBrokersAvailable
+import numpy as np
 import time
 
 logging.basicConfig(
@@ -234,7 +235,7 @@ def main():
         
         for i in range(args.messages):
             wafer_data = {
-                'timestamp': datetime.now().isoformat(),
+                'timestamp': f'2025-11-06 {np.random.randint(0,5)}{np.random.randint(0,9)}:17:16',
                 'wafer_id': f'W{str(i).zfill(8)}',
                 'equipment_id': f'EQ00{(i % 4) + 1}',  # 4 equipment
                 'temperature_c': 350.0 + (i % 10),

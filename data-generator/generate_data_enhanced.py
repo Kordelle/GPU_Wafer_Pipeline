@@ -101,11 +101,7 @@ class ManufacturingDataGenerator:
         logger.debug(f"Generating batch: {num_records} records starting at ID {start_id}")
         
         # Generate timestamps (descending - newest first)
-        base_time = datetime.now()
-        timestamps = [
-            (base_time - timedelta(seconds=x)).replace(microsecond=0)  # Zero out microseconds
-            for x in range(num_records)
-        ]
+        timestamps = [f"2025-11-06 {np.random.randint(0, 5)}{np.random.randint(0, 9)}:17:16" for _ in range(num_records)]
         
         # Generate wafer IDs
         wafer_ids = [f'W{str(i + start_id).zfill(8)}' for i in range(num_records)]

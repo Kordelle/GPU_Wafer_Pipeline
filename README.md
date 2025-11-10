@@ -366,8 +366,10 @@ Semiconductor-Telemetry-Platform/
 - [x] CLI interface
 
 ### Phase 2: Data Pipeline (In Progress)
-- [x] Apache Kafka integration for streaming
-- [x] Apache Spark for batch processing
+- [x] Kafka producer (streaming telemetry)
+- [x] Kafka consumer (archival to MinIO as Parquet)
+- [x] Databricks-compatible schema (microsecond timestamps)
+- [x] Bronze → Silver transformations in Databricks
 - [ ] Time-series database storage (InfluxDB)
 - [ ] Data quality monitoring
 - [ ] Schema validation (Avro/Protobuf)

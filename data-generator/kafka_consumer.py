@@ -7,6 +7,8 @@ from io import BytesIO
 from kafka import KafkaConsumer
 from minio import Minio
 import pandas as pd
+import pyarrow as pa
+import pyarrow.parquet as pq
 
 logging.basicConfig(
     level=logging.INFO,
@@ -95,23 +97,29 @@ class ManufacturingKafkaConsumer:
         try:
             # Convert to DataFrame
             df = pd.DataFrame(batch)
-            
-            # Add timestamp processing
-            df['timestamp'] = pd.to_datetime(df['timestamp'].dt.floor('ms'))
+
+            df['timestamp'] = pd.to_datetime(df['timestamp'], utc=True)
             
             # Generate filename with timestamp
             timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
             date_str = datetime.now().strftime('%Y%m%d')
             filename = f"kafka_batch_{timestamp}_{len(batch)}_records.parquet"
             
-            # Write Parquet to memory buffer
+            # Write Parquet with explicit Arrow schema (TIMESTAMP(MICROS, UTC))
             parquet_buffer = BytesIO()
-            df.to_parquet(
-                parquet_buffer,
-                engine='pyarrow',
-                compression='snappy',
-                index=False
-            )
+            arrow_schema = pa.schema([
+                pa.field('timestamp', pa.timestamp('us', tz='UTC')),
+                pa.field('wafer_id', pa.string()),
+                pa.field('equipment_id', pa.string()),
+                pa.field('temperature_c', pa.float64()),
+                pa.field('pressure_torr', pa.float64()),
+                pa.field('yield_rate', pa.float64()),
+                pa.field('defect_count', pa.int64()),
+                pa.field('is_anomaly', pa.bool_()),
+            ])
+            
+            table = pa.Table.from_pandas(df, schema=arrow_schema, preserve_index=False)
+            pq.write_table(table, parquet_buffer, compression='snappy')
             parquet_buffer.seek(0)
             
             # Upload to MinIO with date partitioning
@@ -129,13 +137,13 @@ class ManufacturingKafkaConsumer:
             self.messages_written += 1
             
             logger.info(
-                f"Wrote batch to MinIO: s3://{bucket_name}/{object_name} "
+                f"✅ Wrote batch to MinIO: s3://{bucket_name}/{object_name} "
                 f"({len(batch)} messages, {parquet_buffer.getbuffer().nbytes / 1024:.1f} KB)"
             )
             
         except Exception as e:
             logger.error(f"Failed to write batch to MinIO: {e}")
-            logger.exception(e)  # Print full stack trace
+            logger.exception(e)
             raise
     
     def consume_and_archive(self):

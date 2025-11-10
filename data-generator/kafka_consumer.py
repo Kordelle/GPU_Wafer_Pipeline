@@ -97,8 +97,11 @@ class ManufacturingKafkaConsumer:
         try:
             # Convert to DataFrame
             df = pd.DataFrame(batch)
-
+            
+            # Convert string → datetime FIRST, then floor
+            # The incoming 'timestamp' field is an ISO string from Kafka JSON
             df['timestamp'] = pd.to_datetime(df['timestamp'], utc=True)
+            df['timestamp'] = df['timestamp'].dt.floor('us')  # Microsecond precision (Databricks-safe)
             
             # Generate filename with timestamp
             timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')

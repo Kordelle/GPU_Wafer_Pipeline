@@ -439,7 +439,6 @@ This project uses specific technologies for local development and learning purpo
 
 **Local Development:**
 - Zero cloud costs during development
-- Full stack runs on laptop (no internet required)
 - Easy debugging and troubleshooting
 
 **Production Migration Path:**

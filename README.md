@@ -46,35 +46,72 @@ This platform simulates a complete semiconductor manufacturing data pipeline, ge
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│                   Data Generator (Python)                    │
-│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐      │
-│  │   Batch      │  │    Large     │  │   Streaming  │      │
-│  │   Mode       │  │    Scale     │  │     Mode     │      │
-│  │  (1K recs)   │  │  (10M+ recs) │  │  (Real-time) │      │
-│  └──────┬───────┘  └──────┬───────┘  └──────┬───────┘      │
-│         │                 │                  │               │
-│         └─────────────────┴──────────────────┘               │
-│                           │                                  │
-│                    JSON Line Output                          │
-│                           │                                  │
-└───────────────────────────┼──────────────────────────────────┘
-                            │
-                            ▼
+│              LOCAL ENVIRONMENT (Docker Compose)              │
+├─────────────────────────────────────────────────────────────┤
+│  ┌──────────────┐    ┌──────────────┐    ┌──────────────┐  │
+│  │    Kafka     │───▶│   Consumer   │───▶│    MinIO     │  │
+│  │  (Streaming) │    │  (Batching)  │    │  (S3-like)   │  │
+│  └──────────────┘    └──────────────┘    └──────────────┘  │
+│         ▲                                         │          │
+│         │                                         │          │
+│  ┌──────────────┐                                │          │
+│  │   Producer   │                                │          │
+│  │ (Synthetic   │                                │          │
+│  │    Data)     │                                │          │
+│  └──────────────┘                                │          │
+└───────────────────────────────────────────────────┼─────────┘
+                                                    │
+                    Manual Upload (Parquet files)  │
+                                                    ▼
 ┌─────────────────────────────────────────────────────────────┐
-│                    Data Storage Layer                        │
-│  • Local File System (JSON Lines)                           │
-│  • Future: Object Storage (S3/GCS/Azure Blob)               │
-│  • Future: Time-Series DB (InfluxDB/TimescaleDB)            │
-└───────────────────────────┬─────────────────────────────────┘
-                            │
-                            ▼
-┌─────────────────────────────────────────────────────────────┐
-│               Analytics & Visualization (Future)             │
-│  • Statistical Analysis                                      │
-│  • Anomaly Detection ML Models                              │
-│  • Real-time Dashboards (Grafana/Streamlit)                 │
-└─────────────────────────────────────────────────────────────┘
+│                   DATABRICKS (Cloud Analytics)               │
+├─────────────────────────────────────────────────────────────┤
+│                                                               │
+│  ┌────────────────────────────────────────────────────────┐ │
+│  │ BRONZE LAYER (Raw Data - System of Record)            │ │
+│  │  • Schema enforcement (explicit types)                 │ │
+│  │  • Data quality checks (nulls, duplicates, ranges)    │ │
+│  │  • Delta Lake (ACID transactions, time travel)        │ │
+│  │  • Date partitioning (query pruning)                  │ │
+│  └─────────────────────┬──────────────────────────────────┘ │
+│                        │                                     │
+│                        ▼                                     │
+│  ┌────────────────────────────────────────────────────────┐ │
+│  │ SILVER LAYER (Curated Data - Coming Soon)             │ │
+│  │  • Deduplication (window functions)                    │ │
+│  │  • Derived columns (shift, equipment age, hour)       │ │
+│  │  • Great Expectations (quality gates)                 │ │
+│  │  • Delta Lake merge (incremental updates)             │ │
+│  └─────────────────────┬──────────────────────────────────┘ │
+│                        │                                     │
+│                        ▼                                     │
+│  ┌────────────────────────────────────────────────────────┐ │
+│  │ GOLD LAYER (Business Metrics - Future)                │ │
+│  │  • Aggregated KPIs (yield by shift, defect trends)    │ │
+│  │  • ML features (rolling averages, anomaly scores)     │ │
+│  │  • BI-ready tables (Power BI, Tableau)                │ │
+│  └────────────────────────────────────────────────────────┘ │
+│                                                               │
+└───────────────────────────────────────────────────────────────┘
 ```
+
+**Medallion Architecture (Production Pattern):**
+- **Bronze**: Raw data preservation, minimal transformations
+- **Silver**: Cleaned, deduplicated, enriched data
+- **Gold**: Business-level aggregations, ML features, dashboards
+
+
+## 🏭 Databricks Integration (Bronze Layer)
+
+### What is the Bronze Layer?
+
+The **Bronze layer** is the foundation of the Medallion Architecture—it preserves raw data exactly as received from the Kafka consumer, with minimal transformations. Think of it as your **system of record** for manufacturing telemetry.
+
+**Key Characteristics:**
+- **Schema enforcement**: Explicit types catch producer bugs
+- **Data quality checks**: Flag issues without dropping records
+- **Immutability**: Never delete Bronze data (audit trail)
+- **Date partitioning**: Efficient time-series queries
 
 ---
 

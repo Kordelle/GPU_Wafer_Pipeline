@@ -406,7 +406,12 @@ Semiconductor-Telemetry-Platform/
 - [x] Kafka producer (streaming telemetry)
 - [x] Kafka consumer (archival to MinIO as Parquet)
 - [x] Databricks-compatible schema (microsecond timestamps)
-- [x] Bronze → Silver transformations in Databricks
+- [x] Bronze layer in Databricks (Delta Lake + quality checks)
+- [x] Manual Parquet upload workflow (MinIO → Databricks)
+- [ ] Silver transformations (deduplication, enrichment, quality gates)
+- [ ] Great Expectations validation suite
+- [ ] Airflow DAG orchestration (Bronze → Silver automation)
+- [ ] Gold layer (aggregated KPIs, ML features)
 - [ ] Time-series database storage (InfluxDB)
 - [ ] Data quality monitoring
 - [ ] Schema validation (Avro/Protobuf)
@@ -470,7 +475,7 @@ This project uses specific technologies for local development and learning purpo
 | **Kafka (self-hosted)** | Learn end-to-end orchestration, full control | **Confluent Cloud**, **AWS MSK**, **Azure Event Hubs** |
 | **Manual offset commits** | Exactly-once delivery guarantees, data integrity | **Keep in production** (critical for preventing data loss/duplication) |
 | **JSON serialization** | Human-readable debugging, easy inspection | **Avro** (3x compression, schema evolution, type safety) |
-| **Named volumes** | Docker-managed persistence, portability | **Cloud persistent volumes** (AWS EBS, Azure Disk, GCP Persistent Disk) |
+| **Binded Volumes** | Development, Dynamic | **Cloud persistent volumes** (AWS EBS, Azure Disk, GCP Persistent Disk) |
 
 ### Why These Choices Matter
 

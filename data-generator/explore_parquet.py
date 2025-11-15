@@ -5,6 +5,7 @@ from pathlib import Path
 
 kafka_batches = [file.name for file in list(Path('../data-generator/output/').glob('kafka_batch_*.parquet'))]
 
+# Summarize parquet files
 def summerize_parquet_files(kafka_batches, summary_type='head') -> None:
     for file in kafka_batches: 
         df = pd.read_parquet(f'../data-generator/output/{file}')
@@ -12,22 +13,23 @@ def summerize_parquet_files(kafka_batches, summary_type='head') -> None:
         file_count = kafka_batches.index(file) + 1
         print("="*50)
         print(f"Batch number {file_count} of {len(kafka_batches)}")
-        if summary_type == 'head':
-            print(f"\nSummary of {batch_num}:")
-            print(df.head())
-        elif summary_type == 'dtypes':
-            print(f"\nData Types of {batch_num}:")
-            print(df.dtypes)
-        elif summary_type == 'info':
-            print(f"\nInfo of {batch_num}:")
-            print(df.info())
-            print(f"Total Records: {len(df)}")
-        elif summary_type == 'describe':
-            print(f"\nDescriptive Statistics of {batch_num}:")
-            print(df.describe())
+        # Generate summaries based on user choice
+        match summary_type:
+            case 'head':
+                print(f"\nSummary of {batch_num}:")
+                print(df.head())
+            case 'dtypes':
+                print(f"\nData Types of {batch_num}:")
+                print(df.dtypes)
+            case 'info':
+                print(f"\nInfo of {batch_num}:")
+                print(df.info())
+                print(f"Total Records: {len(df)}")
+            case 'describe':
+                print(f"\nDescriptive Statistics of {batch_num}:")
+                print(df.describe())
         print("\n")
         time.sleep(2)  # Pause for readability
-            
         
 summary_options = {
     1: 'head',

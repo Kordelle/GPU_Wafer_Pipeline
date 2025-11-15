@@ -456,6 +456,7 @@ Semiconductor-Telemetry-Platform/
 2024-10-24 15:30:40,127 - __main__ - INFO - Batch size: 1,000,000 | Batches: 10
 2024-10-24 15:30:52,341 - __main__ - INFO - Batch 1: 1,000,000 records | Progress: 10.0% | Rate: 81,300 rec/sec
 2024-10-24 15:31:04,562 - __main__ - INFO - Batch 2: 1,000,000 records | Progress: 20.0% | Rate: 82,150 rec/sec
+2024-10-24 15:31:04,562 - __main__ - INFO - Batch 2: 1,000,000 records | Progress: 30.0% | Rate: 81,750 rec/sec
 ...
 2024-10-24 15:32:18,789 - __main__ - INFO - Generated 10,000,000 records in 98.67s
 2024-10-24 15:32:18,790 - __main__ - INFO -    Average rate: 101,347 records/sec

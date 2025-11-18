@@ -1,6 +1,7 @@
 """
 Kafka Producer for Manufacturing Telemetry Streaming
 Produces wafer manufacturing data to Kafka topics with partitioning by equipment_id
+Ensures ordered processing of messages per equipment while allowing parallelism across different equipment.
 """
 import json
 import logging

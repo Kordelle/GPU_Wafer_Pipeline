@@ -408,7 +408,7 @@ Semiconductor-Telemetry-Platform/
 - [x] Databricks-compatible schema (microsecond timestamps)
 - [x] Bronze layer in Databricks (Delta Lake + quality checks)
 - [x] Manual Parquet upload workflow (MinIO → Databricks)
-- [ ] Silver transformations (deduplication, enrichment, quality gates)
+- [x] Silver transformations (deduplication, enrichment, quality gates)
 - [ ] Great Expectations validation suite
 - [ ] Airflow DAG orchestration (Bronze → Silver automation)
 - [ ] Gold layer (aggregated KPIs, ML features)

@@ -7,3 +7,5 @@ kafka-python==2.0.2
 python-snappy==0.6.1
 pyarrow==14.0.1
 fastparquet==2023.10.1
+great-expectations==0.18.19
+sqlalchemy==1.4.49

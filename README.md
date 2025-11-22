@@ -409,7 +409,7 @@ Semiconductor-Telemetry-Platform/
 - [x] Bronze layer in Databricks (Delta Lake + quality checks)
 - [x] Manual Parquet upload workflow (MinIO → Databricks)
 - [x] Silver transformations (deduplication, enrichment, quality gates)
-- [x] Great Expectations validation suite
+- [x] Great Expectations validation suite (Data Bricks Implementation)
 - [ ] Airflow DAG orchestration (Bronze → Silver automation)
 - [ ] Gold layer (aggregated KPIs, ML features)
 - [ ] Time-series database storage (InfluxDB)

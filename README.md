@@ -114,6 +114,26 @@ The **Bronze layer** is the foundation of the Medallion Architecture—it preser
 - **Date partitioning**: Efficient time-series queries
 
 ---
+## Data Quality Validation
+
+Two validation strategies for different compute environments:
+
+**Local Development (Docker):**
+- Great Expectations library (`validation/local_validator.py`)
+- Rich validation reports with detailed expectations
+- Works with local Spark clusters (PERSIST supported)
+
+**Databricks Serverless:**
+- Native PySpark validation (`validation/pyspark_validator.py`)
+- No external dependencies, serverless-compatible
+- Optimized Spark SQL queries for distributed validation
+
+Both validators share the same CVD process validation rules from `great_expectations_config.py`:
+- Temperature: 330-380 degrees C (optimal 350 degrees C)
+- Pressure: 6-14 Torr (optimal 10 Torr)
+- Yield rate: 50-100% (target 95%+)
+- Defect count: 0-30 (equipment failure >20)
+---
 
 ## Features
 

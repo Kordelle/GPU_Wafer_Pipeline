@@ -12,12 +12,14 @@ A production-grade data engineering demonstration showcasing real-time telemetry
 - [Architecture](#architecture)
 - [Features](#features)
 - [Quick Start](#quick-start)
+- [Data Quality Validation](#data-quality-validation)
 - [Data Generation Modes](#data-generation-modes)
 - [Statistical Distributions](#statistical-distributions)
 - [Anomaly Injection](#anomaly-injection)
 - [Docker Usage](#docker-usage)
 - [CLI Reference](#cli-reference)
 - [Project Structure](#project-structure)
+- [Technology Decisions](#technology-decisions)
 - [Roadmap](#roadmap)
 
 ---
@@ -31,6 +33,7 @@ This platform simulates a complete semiconductor manufacturing data pipeline, ge
 - **Real-time streaming simulation** for continuous telemetry
 - **Intelligent anomaly injection** simulating equipment failures
 - **Containerized deployment** with Docker
+- **Production-grade data quality validation** with dual validator strategy
 
 ### Use Cases
 
@@ -45,9 +48,8 @@ This platform simulates a complete semiconductor manufacturing data pipeline, ge
 ## Architecture
 
 ```
+LOCAL ENVIRONMENT (Docker Compose)
 ┌─────────────────────────────────────────────────────────────┐
-│              LOCAL ENVIRONMENT (Docker Compose)              │
-├─────────────────────────────────────────────────────────────┤
 │  ┌──────────────┐    ┌──────────────┐    ┌──────────────┐  │
 │  │    Kafka     │───▶│   Consumer   │───▶│    MinIO     │  │
 │  │  (Streaming) │    │  (Batching)  │    │  (S3-like)   │  │
@@ -77,10 +79,10 @@ This platform simulates a complete semiconductor manufacturing data pipeline, ge
 │                        │                                     │
 │                        ▼                                     │
 │  ┌────────────────────────────────────────────────────────┐ │
-│  │ SILVER LAYER (Curated Data - Coming Soon)             │ │
+│  │ SILVER LAYER (Curated Data - Transformations)         │ │
 │  │  • Deduplication (window functions)                    │ │
 │  │  • Derived columns (shift, equipment age, hour)       │ │
-│  │  • Great Expectations (quality gates)                 │ │
+│  │  • Quality gates (native PySpark validation)          │ │
 │  │  • Delta Lake merge (incremental updates)             │ │
 │  └─────────────────────┬──────────────────────────────────┘ │
 │                        │                                     │
@@ -100,39 +102,6 @@ This platform simulates a complete semiconductor manufacturing data pipeline, ge
 - **Silver**: Cleaned, deduplicated, enriched data
 - **Gold**: Business-level aggregations, ML features, dashboards
 
-
-## 🏭 Databricks Integration (Bronze Layer)
-
-### What is the Bronze Layer?
-
-The **Bronze layer** is the foundation of the Medallion Architecture—it preserves raw data exactly as received from the Kafka consumer, with minimal transformations. Think of it as your **system of record** for manufacturing telemetry.
-
-**Key Characteristics:**
-- **Schema enforcement**: Explicit types catch producer bugs
-- **Data quality checks**: Flag issues without dropping records
-- **Immutability**: Never delete Bronze data (audit trail)
-- **Date partitioning**: Efficient time-series queries
-
----
-## Data Quality Validation
-
-Two validation strategies for different compute environments:
-
-**Local Development (Docker):**
-- Great Expectations library (`validation/local_validator.py`)
-- Rich validation reports with detailed expectations
-- Works with local Spark clusters (PERSIST supported)
-
-**Databricks Serverless:**
-- Native PySpark validation (`validation/pyspark_validator.py`)
-- No external dependencies, serverless-compatible
-- Optimized Spark SQL queries for distributed validation
-
-Both validators share the same CVD process validation rules from `great_expectations_config.py`:
-- Temperature: 330-380 degrees C (optimal 350 degrees C)
-- Pressure: 6-14 Torr (optimal 10 Torr)
-- Yield rate: 50-100% (target 95%+)
-- Defect count: 0-30 (equipment failure >20)
 ---
 
 ## Features
@@ -166,6 +135,7 @@ Both validators share the same CVD process validation rules from `great_expectat
 - Comprehensive logging
 - CLI argument configuration
 - Statistical validation tools
+- Dual validation strategy (Great Expectations + native PySpark)
 
 ---
 
@@ -199,6 +169,154 @@ cat output/wafer_data.json | head -5
 
 ```bash
 cat output/generator.log
+```
+
+---
+
+## Data Quality Validation
+
+This project implements **dual validation strategies** to support different compute environments—a production pattern used in multi-cloud architectures.
+
+### Validation Architecture
+
+```
+validation/
+├── __init__.py                    # Module exports
+├── local_validator.py             # Great Expectations (local Docker)
+└── pyspark_validator.py           # Native PySpark (Databricks Serverless)
+```
+
+### Local Development (Docker Environment)
+
+**Use Case**: Development, testing, rich validation reports
+
+**Implementation**: Great Expectations library with `SparkDFDataset`
+
+```python
+from validation.local_validator import LocalValidator
+
+validator = LocalValidator()
+results = validator.validate_dataframe(df, layer="bronze")
+
+if not validator.is_valid(results):
+    raise Exception(f"Validation failed: {results['critical_failures']} critical failures")
+```
+
+**Features:**
+- Pre-built expectation suite from `great_expectations_config.py`
+- Detailed validation reports with pass/fail metrics
+- Works on local Spark clusters (supports PERSIST operations)
+- Rich debugging output for development
+
+### Databricks Serverless (Cloud Environment)
+
+**Use Case**: Production pipelines, serverless compute, minimal dependencies
+
+**Implementation**: Native PySpark validation queries
+
+```python
+from validation.pyspark_validator import PySparkValidator
+
+validator = PySparkValidator()
+results = validator.validate_dataframe(df, layer="silver")
+
+if not validator.is_valid(results):
+    raise Exception(f"Pipeline blocked: {results['critical_failures']} critical validations failed")
+```
+
+**Features:**
+- No external library dependencies
+- Compiles to optimized Spark SQL queries
+- Compatible with Databricks Serverless compute (no PERSIST)
+- Distributed validation at petabyte scale
+
+### Shared Validation Rules (CVD Process Specs)
+
+Both validators enforce the same manufacturing standards:
+
+| Parameter | Normal Range | Optimal Target | Critical Threshold |
+|-----------|--------------|----------------|-------------------|
+| **Temperature** | 340-360°C | 350°C | 330-380°C (98% tolerance) |
+| **Pressure** | 8-12 Torr | 10 Torr | 6-14 Torr (98% tolerance) |
+| **Yield Rate** | 85-100% | 95%+ | 50-100% (95% tolerance) |
+| **Defect Count** | 0-8 defects | ≤2 defects | 0-30 defects (98% tolerance) |
+
+### Validation Result Structure
+
+Both validators return identical result structures:
+
+```python
+{
+    "total_validations": 16,
+    "passed": 14,
+    "failed": 2,
+    "critical_failures": 0,  # Non-zero blocks pipeline
+    "results": [
+        {
+            "validation": "wafer_id_uniqueness",
+            "column": "wafer_id",
+            "success": True,
+            "critical": True
+        },
+        # ... more validation results
+    ]
+}
+```
+
+### When to Use Each Validator
+
+**Local Docker Development:**
+```bash
+# Run with Great Expectations
+python -c "
+from pyspark.sql import SparkSession
+from validation.local_validator import LocalValidator
+
+spark = SparkSession.builder.appName('local-validation').getOrCreate()
+df = spark.read.parquet('output/wafer-telemetry/*.parquet')
+
+validator = LocalValidator()
+results = validator.validate_dataframe(df, layer='bronze')
+print(f'Pass rate: {results[\"passed\"]}/{results[\"total_validations\"]}')
+"
+```
+
+**Databricks Notebooks:**
+```python
+# Cell: Validate Silver Layer
+from validation.pyspark_validator import PySparkValidator
+
+silver_df = spark.table("silver.wafer_telemetry")
+
+validator = PySparkValidator()
+results = validator.validate_dataframe(silver_df, layer="silver")
+
+if not validator.is_valid(results):
+    dbutils.notebook.exit(f"Validation failed: {results['critical_failures']} critical failures")
+```
+
+### Production Integration (Airflow Example)
+
+```python
+def validate_silver_task(**context):
+    """Environment-aware validation in Airflow DAG"""
+    
+    compute_env = Variable.get("COMPUTE_ENVIRONMENT", "local")
+    
+    if compute_env == "databricks":
+        from validation.pyspark_validator import PySparkValidator
+        validator = PySparkValidator()
+    else:
+        from validation.local_validator import LocalValidator
+        validator = LocalValidator()
+    
+    df = spark.table("silver.wafer_telemetry")
+    results = validator.validate_dataframe(df, layer="silver")
+    
+    if not validator.is_valid(results):
+        raise AirflowFailException("Data quality gate failed")
+    
+    return results
 ```
 
 ---
@@ -402,20 +520,109 @@ optional arguments:
 
 ```
 Semiconductor-Telemetry-Platform/
-├── data-generator/          # Production streaming pipeline
-│   ├── kafka_producer.py    # Generates wafer telemetry
-│   ├── kafka_consumer.py    # Writes to MinIO
-│   └── generate_data_enhanced.py
+├── data-generator/                    # Production data pipeline
+│   ├── generate_data_enhanced.py      # Synthetic data generator (batch/large/stream)
+│   ├── kafka_producer.py              # Streams telemetry to Kafka
+│   ├── kafka_consumer.py              # Consumes from Kafka, writes to MinIO
+│   ├── explore_parquet.py             # Parquet file analysis utility
+│   ├── great_expectations_config.py   # Validation rule definitions (CVD specs)
+│   ├── requirements.txt               # Python dependencies
+│   ├── Dockerfile                     # Container image definition
+│   │
+│   ├── validation/                    # Data quality validation module
+│   │   ├── __init__.py                # Module exports
+│   │   ├── local_validator.py         # Great Expectations wrapper (local)
+│   │   └── pyspark_validator.py       # Native PySpark validator (Databricks)
+│   │
+│   ├── research/                      # Exploratory analysis
+│   │   └── explore_distributions.py   # Statistical distribution verification
+│   │
+│   ├── output/                        # Generated data artifacts
+│   │   ├── wafer_data.json            # Default output file
+│   │   ├── generator.log              # Execution logs
+│   │   └── wafer-telemetry/           # Parquet files for Databricks upload
+│   │
+│   └── images/                        # Documentation assets
 │
-├── notebooks/               # Research & analysis
-│   └── explore_distributions.py
+├── databricks-notebooks/              # Cloud analytics notebooks
+│   ├── 01_Bronze_Layer_Setup.py       # Raw data ingestion (Delta Lake)
+│   ├── 02_Silver_Layer_Transformations.py  # Data cleaning and enrichment
+│   └── 03_Data_Quality_Validation.py  # Native PySpark validation suite
 │
-└── docker-compose.yml       # Infrastructure definition
+├── docker-compose.yml                 # Multi-service orchestration (Kafka, MinIO)
+└── README.md                          # This file
 ```
+
+### Key Files Explained
+
+**Core Generation:**
+- `generate_data_enhanced.py`: Synthetic wafer telemetry generator with 3 modes (batch/large/stream)
+- `great_expectations_config.py`: CVD process validation rules (temperature, pressure, yield thresholds)
+
+**Streaming Pipeline:**
+- `kafka_producer.py`: Produces telemetry to Kafka topics with equipment-based partitioning
+- `kafka_consumer.py`: Consumes from Kafka, batches to Parquet, writes to MinIO (S3-compatible)
+
+**Data Quality:**
+- `validation/local_validator.py`: Great Expectations wrapper for local Docker environments
+- `validation/pyspark_validator.py`: Native PySpark validation for Databricks Serverless
+- Both share validation rules from `great_expectations_config.py`
+
+**Databricks Notebooks:**
+- `01_Bronze_Layer_Setup.py`: Schema enforcement, quality checks, Delta Lake ACID transactions
+- `02_Silver_Layer_Transformations.py`: Deduplication, derived columns, quality gates
+- `03_Data_Quality_Validation.py`: Automated validation suite with PySpark
+
+**Infrastructure:**
+- `docker-compose.yml`: Orchestrates Kafka, MinIO, and producer/consumer services
+- `Dockerfile`: Container image for data generator with Python dependencies
+
+---
+
+## Technology Decisions
+
+This project uses specific technologies for local development and learning purposes. Here's the rationale and production alternatives:
+
+| Decision | Rationale | Production Alternative |
+|----------|-----------|------------------------|
+| **Docker Compose** | Local dev simplicity, easy multi-service orchestration | **Kubernetes** (AKS/EKS/GKE) for production-grade container orchestration |
+| **MinIO** | S3-compatible API, zero cloud costs, local testing | **AWS S3**, **Azure Blob Storage**, **Google Cloud Storage** |
+| **Kafka (self-hosted)** | Learn end-to-end orchestration, full control | **Confluent Cloud**, **AWS MSK**, **Azure Event Hubs** |
+| **Manual offset commits** | Exactly-once delivery guarantees, data integrity | **Keep in production** (critical for preventing data loss/duplication) |
+| **JSON serialization** | Human-readable debugging, easy inspection | **Avro** (3x compression, schema evolution, type safety) |
+| **Bound volumes** | Development flexibility, dynamic changes | **Cloud persistent volumes** (AWS EBS, Azure Disk, GCP Persistent Disk) |
+| **Great Expectations** | Rich validation reports, local debugging | **Native PySpark** (Databricks Serverless compatibility, no library overhead) |
+
+### Why These Choices Matter
+
+**Local Development:**
+- Zero cloud costs during development
+- Full stack runs on laptop (no internet required)
+- Easy debugging and troubleshooting
+- Great Expectations provides rich validation reports
+
+**Production Migration Path:**
+- Each component has a clear cloud-native alternative
+- Architecture patterns remain the same (Kafka → Kafka, S3 → S3)
+- Minimal code changes needed for cloud deployment
+- Skills transfer directly to enterprise environments
+- Dual validation strategy supports multi-cloud deployments
+
+### When to Upgrade
+
+| Component | Upgrade Trigger | Why |
+|-----------|----------------|-----|
+| **Docker Compose → Kubernetes** | Need auto-scaling, multi-region, or >10 services | K8s provides orchestration, health checks, rolling updates |
+| **MinIO → Cloud Storage** | Need 99.999% durability, global CDN, or >10TB data | Cloud providers offer built-in replication and disaster recovery |
+| **Self-hosted Kafka → Managed** | Team lacks Kafka ops expertise or need 24/7 uptime | Managed services handle maintenance, upgrades, monitoring |
+| **JSON → Avro** | Storage costs exceed $100/month or schema changes break consumers | Avro reduces storage 3x and provides backward compatibility |
+| **Great Expectations → PySpark** | Deploying to Databricks Serverless or need petabyte scale | Native PySpark compiles to optimized Spark SQL, no PERSIST overhead |
+
+---
 
 ## Roadmap
 
-### Phase 1: Core Data Generation ✅
+### Phase 1: Core Data Generation (Completed)
 - [x] Statistical distribution implementation
 - [x] Anomaly injection engine
 - [x] Batch/Large/Stream modes
@@ -429,11 +636,10 @@ Semiconductor-Telemetry-Platform/
 - [x] Bronze layer in Databricks (Delta Lake + quality checks)
 - [x] Manual Parquet upload workflow (MinIO → Databricks)
 - [x] Silver transformations (deduplication, enrichment, quality gates)
-- [x] Native PySpark for validation logic (Great Expectations & Databricks Non-Compatible)
+- [x] Dual validation strategy (Great Expectations + native PySpark)
 - [ ] Airflow DAG orchestration (Bronze → Silver automation)
 - [ ] Gold layer (aggregated KPIs, ML features)
 - [ ] Time-series database storage (InfluxDB)
-- [ ] Data quality monitoring
 - [ ] Schema validation (Avro/Protobuf)
 
 ### Phase 3: Analytics Layer
@@ -441,18 +647,21 @@ Semiconductor-Telemetry-Platform/
 - [ ] Anomaly detection ML models (Isolation Forest, LSTM)
 - [ ] Statistical process control (SPC) charts
 - [ ] Alerting system (PagerDuty/Slack)
+- [ ] Integration with Databricks ML runtime
 
 ### Phase 4: Cloud Deployment
 - [ ] Kubernetes deployment (NVIDIA GPU Operator)
 - [ ] Cloud storage integration (S3/GCS/Azure)
 - [ ] Distributed processing (Dask/Ray)
 - [ ] Multi-region data replication
+- [ ] Managed Kafka migration (Confluent Cloud)
 
 ### Phase 5: Advanced Features
 - [ ] Digital twin simulation
 - [ ] Predictive maintenance models
 - [ ] Equipment performance optimization
 - [ ] Supply chain integration
+- [ ] RAPIDS/cuDF GPU acceleration
 
 ---
 
@@ -482,42 +691,19 @@ Semiconductor-Telemetry-Platform/
 2024-10-24 15:32:18,791 - __main__ - INFO -    File size: 1,234.56 MB
 ```
 
+### Validation Output
 
----
-## Technology Decisions
+```
+VALIDATION SUMMARY
+======================================================================
+Total Validations: 16
+Passed: 16 (100.0%)
+Failed: 0
+======================================================================
 
-This project uses specific technologies for local development and learning purposes. Here's the rationale and production alternatives:
-
-| Decision | Rationale | Production Alternative |
-|----------|-----------|------------------------|
-| **Docker Compose** | Local dev simplicity, easy multi-service orchestration | **Kubernetes** (AKS/EKS/GKE) for production-grade container orchestration |
-| **MinIO** | S3-compatible API, zero cloud costs, local testing | **AWS S3**, **Azure Blob Storage**, **Google Cloud Storage** |
-| **Kafka (self-hosted)** | Learn end-to-end orchestration, full control | **Confluent Cloud**, **AWS MSK**, **Azure Event Hubs** |
-| **Manual offset commits** | Exactly-once delivery guarantees, data integrity | **Keep in production** (critical for preventing data loss/duplication) |
-| **JSON serialization** | Human-readable debugging, easy inspection | **Avro** (3x compression, schema evolution, type safety) |
-| **Binded Volumes** | Development, Dynamic | **Cloud persistent volumes** (AWS EBS, Azure Disk, GCP Persistent Disk) |
-
-### Why These Choices Matter
-
-**Local Development:**
-- Zero cloud costs during development
-- Full stack runs on laptop (no internet required)
-- Easy debugging and troubleshooting
-
-**Production Migration Path:**
-- Each component has a clear cloud-native alternative
-- Architecture patterns remain the same (Kafka → Kafka, S3 → S3)
-- Minimal code changes needed for cloud deployment
-- Skills transfer directly to enterprise environments
-
-### When to Upgrade
-
-| Component | Upgrade Trigger | Why |
-|-----------|----------------|-----|
-| **Docker Compose → Kubernetes** | Need auto-scaling, multi-region, or >10 services | K8s provides orchestration, health checks, rolling updates |
-| **MinIO → Cloud Storage** | Need 99.999% durability, global CDN, or >10TB data | Cloud providers offer built-in replication and disaster recovery |
-| **Self-hosted Kafka → Managed** | Team lacks Kafka ops expertise or need 24/7 uptime | Managed services handle maintenance, upgrades, monitoring |
-| **JSON → Avro** | Storage costs exceed $100/month or schema changes break consumers | Avro reduces storage 3x and provides backward compatibility |
+All validations passed!
+Pipeline may continue to Gold layer
+```
 
 ---
 
@@ -537,6 +723,12 @@ pip install -r requirements.txt
 
 # Run locally (without Docker)
 python generate_data_enhanced.py --mode batch --records 1000
+
+# Test validation module
+python -c "
+from validation.local_validator import LocalValidator
+print('Validation module loaded successfully')
+"
 ```
 
 ---
@@ -562,6 +754,7 @@ Copyright (c) 2025 Kordelle
 - **NVIDIA**: Inspiration from GPU manufacturing processes
 - **Semiconductor Industry**: Real-world telemetry patterns
 - **Open Source Community**: Python data science ecosystem
+- **Great Expectations**: Data quality validation framework
 
 ---
 

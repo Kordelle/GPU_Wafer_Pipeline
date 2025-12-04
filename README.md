@@ -294,31 +294,6 @@ results = validator.validate_dataframe(silver_df, layer="silver")
 if not validator.is_valid(results):
     dbutils.notebook.exit(f"Validation failed: {results['critical_failures']} critical failures")
 ```
-
-### Production Integration (Airflow Example)
-
-```python
-def validate_silver_task(**context):
-    """Environment-aware validation in Airflow DAG"""
-    
-    compute_env = Variable.get("COMPUTE_ENVIRONMENT", "local")
-    
-    if compute_env == "databricks":
-        from validation.pyspark_validator import PySparkValidator
-        validator = PySparkValidator()
-    else:
-        from validation.local_validator import LocalValidator
-        validator = LocalValidator()
-    
-    df = spark.table("silver.wafer_telemetry")
-    results = validator.validate_dataframe(df, layer="silver")
-    
-    if not validator.is_valid(results):
-        raise AirflowFailException("Data quality gate failed")
-    
-    return results
-```
-
 ---
 
 ## Data Generation Modes

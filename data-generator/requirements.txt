@@ -7,5 +7,10 @@ kafka-python==2.0.2
 python-snappy==0.6.1
 pyarrow==14.0.1
 fastparquet==2023.10.1
+# Data quality (local environment only)
 great-expectations==0.18.19
 sqlalchemy==1.4.49
+
+# Note: Great Expectations used in local Docker environment
+# Databricks uses native PySpark validation (validation/pyspark_validator.py)
+# Both validators share same thresholds (great_expectations_config.py)

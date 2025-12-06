@@ -28,6 +28,12 @@ def summerize_parquet_files(kafka_batches, summary_type='head') -> None:
             case 'describe':
                 print(f"\nDescriptive Statistics of {batch_num}:")
                 print(df.describe())
+            case 'size':
+                table = pq.read_table(f'../data-generator/output/{file}')
+                print(f"\nSize of {batch_num}:")
+                print(f"Number of rows: {table.num_rows}")
+                print(f"Number of columns: {table.num_columns}")
+                print(f"Total size (bytes): {table.nbytes}")
             case _:
                 print("Exiting summary.")
         print("\n")
@@ -38,10 +44,11 @@ summary_options = {
     2: 'dtypes',
     3: 'info',
     4: 'describe',
-    5: 'exit'
+    5: 'size',
+    6: 'exit'
 }
         
-i = int(input(f"Select summary type:\n1. Head\n2. Data Types\n3. Info\n4. Describe\n5. Exit\nEnter choice (1-5): \n"))
+i = int(input(f"Select summary type:\n1. Head\n2. Data Types\n3. Info\n4. Describe\n5. Size\n6. Exit\nEnter choice (1-6): \n"))
 while i not in summary_options:
     i = int(input("Invalid choice. Please enter a number between 1 and 4: \n"))
         

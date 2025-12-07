@@ -18,6 +18,9 @@ def summerize_parquet_files(kafka_batches, summary_type='head') -> None:
             case 'head':
                 print(f"\nSummary of {batch_num}:")
                 print(df.head())
+            case 'columns':
+                print(f"\nColumns of {batch_num}:")
+                print(df.columns)
             case 'dtypes':
                 print(f"\nData Types of {batch_num}:")
                 print(df.dtypes)
@@ -41,16 +44,17 @@ def summerize_parquet_files(kafka_batches, summary_type='head') -> None:
         
 summary_options = {
     1: 'head',
-    2: 'dtypes',
-    3: 'info',
-    4: 'describe',
-    5: 'size',
-    6: 'exit'
+    2: 'columns',
+    3: 'dtypes',
+    4: 'info',
+    5: 'describe',
+    6: 'size',
+    7: 'exit'
 }
         
-i = int(input(f"Select summary type:\n1. Head\n2. Data Types\n3. Info\n4. Describe\n5. Size\n6. Exit\nEnter choice (1-6): \n"))
+i = int(input(f"Select summary type:\n1. Head\n2. Columns\n3. Data Types\n4. Info\n5. Describe\n6. Size\n7. Exit\nEnter choice (1-7): \n"))
 while i not in summary_options:
-    i = int(input("Invalid choice. Please enter a number between 1 and 4: \n"))
+    i = int(input("Invalid choice. Please enter a number between 1 and 7: \n"))
         
 summerize_parquet_files(kafka_batches, summary_type= summary_options[i])
 

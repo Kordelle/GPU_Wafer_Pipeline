@@ -49,6 +49,17 @@ def summerize_parquet_files(kafka_batches, summary_type='head') -> None:
             case 'shape':
                 print(f"\nShape of {batch_num}:")
                 print(df.shape)
+            case 'nulls':
+                print(f"\nMissing Data Analysis:")
+                null_counts = df.isnull().sum()
+                null_pct = (null_counts / len(df) * 100).round(2)
+                null_summary = pd.DataFrame({
+                    'Null_Count': null_counts,
+                    'Null_Percentage': null_pct
+                })
+                print(null_summary[null_summary['Null_Count'] > 0])
+                if null_counts.sum() == 0:
+                    print("No missing values detected!")
             case _:
                 print("Exiting summary.")
         print("\n")
@@ -65,12 +76,13 @@ summary_options = {
     8: 'describe_all',
     9: 'size',
     10: 'shape',
-    11: 'exit'
+    11: 'nulls',
+    12: 'exit'
 }
         
-i = int(input(f"Select summary type:\n1. Head\n2. sample\n3. Columns\n4. Data Types\n5. Info\n6. Index\n7. Describe\n8. Describe All\n9. Size\n10. Shape\n11. Exit\nEnter choice (1-11): \n"))
+i = int(input(f"Select summary type:\n1. Head\n2. sample\n3. Columns\n4. Data Types\n5. Info\n6. Index\n7. Describe\n8. Describe All\n9. Size\n10. Shape\n11. Missing Data Analysis\n12. Exit\nEnter choice (1-12): \n"))
 while i not in summary_options:
-    i = int(input("Invalid choice. Please enter a number between 1 and 11: \n"))
+    i = int(input("Invalid choice. Please enter a number between 1 and 12: \n"))
         
 summerize_parquet_files(kafka_batches, summary_type= summary_options[i])
 

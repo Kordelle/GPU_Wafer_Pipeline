@@ -60,6 +60,12 @@ def summerize_parquet_files(kafka_batches, summary_type='head') -> None:
                 print(null_summary[null_summary['Null_Count'] > 0])
                 if null_counts.sum() == 0:
                     print("No missing values detected!")
+            case 'duplicates':
+                dup_count = df.duplicated().sum()
+                print(f"\nDuplicate Rows: {dup_count:,} ({dup_count/len(df)*100:.2f}%)")
+                if 'wafer_id' in df.columns:
+                    dup_wafers = df['wafer_id'].duplicated().sum()
+                    print(f"Duplicate Wafer IDs: {dup_wafers:,}")
             case _:
                 print("Exiting summary.")
         print("\n")
@@ -77,12 +83,13 @@ summary_options = {
     9: 'size',
     10: 'shape',
     11: 'nulls',
-    12: 'exit'
+    12: 'duplicates',
+    13: 'exit'
 }
         
-i = int(input(f"Select summary type:\n1. Head\n2. sample\n3. Columns\n4. Data Types\n5. Info\n6. Index\n7. Describe\n8. Describe All\n9. Size\n10. Shape\n11. Missing Data Analysis\n12. Exit\nEnter choice (1-12): \n"))
+i = int(input(f"Select summary type:\n1. Head\n2. sample\n3. Columns\n4. Data Types\n5. Info\n6. Index\n7. Describe\n8. Describe All\n9. Size\n10. Shape\n11. Missing Data Analysis\n12. Duplicate Rows\n13. Exit\nEnter choice (1-13): \n"))
 while i not in summary_options:
-    i = int(input("Invalid choice. Please enter a number between 1 and 12: \n"))
+    i = int(input("Invalid choice. Please enter a number between 1 and 13: \n"))
         
 summerize_parquet_files(kafka_batches, summary_type= summary_options[i])
 

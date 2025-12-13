@@ -72,6 +72,15 @@ def summerize_parquet_files(kafka_batches, summary_type='head') -> None:
                 unique_counts = df.nunique()
                 print(unique_counts)
                 
+            case 'value_counts':
+                print(f"\nFrequency Distribution:")
+                if 'equipment_id' in df.columns:
+                    print("\nEquipment ID Distribution:")
+                    print(df['equipment_id'].value_counts())
+                if 'is_anomaly' in df.columns:
+                    print("\nAnomaly Distribution:")
+                    print(df['is_anomaly'].value_counts())
+                
             case _:
                 print("Exiting summary.")
         print("\n")
@@ -91,12 +100,13 @@ summary_options = {
     11: 'nulls',
     12: 'duplicates',
     13: 'unique',
-    14: 'exit'
+    14: 'value_counts',
+    15: 'exit'
 }
         
-i = int(input(f"Select summary type:\n1. Head\n2. sample\n3. Columns\n4. Data Types\n5. Info\n6. Index\n7. Describe\n8. Describe All\n9. Size\n10. Shape\n11. Missing Data Analysis\n12. Duplicate Rows\n13. Unique Values per Column\n14. Exit\nEnter choice (1-14): \n"))
+i = int(input(f"Select summary type:\n1. Head\n2. sample\n3. Columns\n4. Data Types\n5. Info\n6. Index\n7. Describe\n8. Describe All\n9. Size\n10. Shape\n11. Missing Data Analysis\n12. Duplicate Rows\n13. Unique Values per Column\n14. Frequency Distribution\n15. Exit\nEnter choice (1-15): \n"))
 while i not in summary_options:
-    i = int(input("Invalid choice. Please enter a number between 1 and 14: \n"))
+    i = int(input("Invalid choice. Please enter a number between 1 and 15: \n"))
         
 summerize_parquet_files(kafka_batches, summary_type= summary_options[i])
 

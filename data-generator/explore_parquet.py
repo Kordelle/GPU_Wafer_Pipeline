@@ -80,6 +80,21 @@ def summerize_parquet_files(kafka_batches, summary_type='head') -> None:
                 if 'is_anomaly' in df.columns:
                     print("\nAnomaly Distribution:")
                     print(df['is_anomaly'].value_counts())
+                    
+            case 'anomalies':
+                if 'is_anomaly' in df.columns:
+                    anomaly_count = df['is_anomaly'].sum()
+                    anomaly_rate = anomaly_count / len(df) * 100
+                    print(f"\nAnomaly Analysis:")
+                    print(f"  Total anomalies: {anomaly_count:,} ({anomaly_rate:.2f}%)")
+                    print(f"  Normal records: {len(df) - anomaly_count:,}")
+                    
+                    if anomaly_count > 0:
+                        print("\nAnomaly Statistics:")
+                        anomaly_df = df[df['is_anomaly'] == True]
+                        print(anomaly_df[['temperature_c', 'pressure_torr', 'yield_rate', 'defect_count']].describe())
+                else:
+                    print("No 'is_anomaly' column found")
                 
             case _:
                 print("Exiting summary.")
@@ -101,12 +116,13 @@ summary_options = {
     12: 'duplicates',
     13: 'unique',
     14: 'value_counts',
-    15: 'exit'
+    15: 'anomalies',
+    16: 'exit'
 }
         
-i = int(input(f"Select summary type:\n1. Head\n2. sample\n3. Columns\n4. Data Types\n5. Info\n6. Index\n7. Describe\n8. Describe All\n9. Size\n10. Shape\n11. Missing Data Analysis\n12. Duplicate Rows\n13. Unique Values per Column\n14. Frequency Distribution\n15. Exit\nEnter choice (1-15): \n"))
+i = int(input(f"Select summary type:\n1. Head\n2. sample\n3. Columns\n4. Data Types\n5. Info\n6. Index\n7. Describe\n8. Describe All\n9. Size\n10. Shape\n11. Missing Data Analysis\n12. Duplicate Rows\n13. Unique Values per Column\n14. Frequency Distribution\n15. Anomaly Analysis\n16. Exit\nEnter choice (1-16): \n"))
 while i not in summary_options:
-    i = int(input("Invalid choice. Please enter a number between 1 and 15: \n"))
+    i = int(input("Invalid choice. Please enter a number between 1 and 16: \n"))
         
 summerize_parquet_files(kafka_batches, summary_type= summary_options[i])
 

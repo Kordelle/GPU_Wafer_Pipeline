@@ -100,6 +100,17 @@ def summerize_parquet_files(kafka_batches, summary_type='head') -> None:
                 print(f"\nCorrelation Matrix (Numeric Columns):")
                 numeric_cols = df.select_dtypes(include=['float64', 'int64']).columns
                 print(df[numeric_cols].corr().round(3))
+            
+            case 'memory':
+                print(f"\nMemory Usage by Column:")
+                mem_usage = df.memory_usage(deep=True)
+                mem_mb = mem_usage / 1024**2
+                mem_summary = pd.DataFrame({
+                    'Column': mem_usage.index,
+                    'Memory_MB': mem_mb.round(2)
+                }).sort_values('Memory_MB', ascending=False)
+                print(mem_summary)
+                print(f"\nTotal Memory: {mem_mb.sum():.2f} MB")
                 
             case _:
                 print("Exiting summary.")
@@ -123,12 +134,13 @@ summary_options = {
     14: 'value_counts',
     15: 'anomalies',
     16: 'corr',
-    17: 'exit'
+    17: 'memory',
+    18: 'exit'
 }
         
-i = int(input(f"Select summary type:\n1. Head\n2. sample\n3. Columns\n4. Data Types\n5. Info\n6. Index\n7. Describe\n8. Describe All\n9. Size\n10. Shape\n11. Missing Data Analysis\n12. Duplicate Rows\n13. Unique Values per Column\n14. Frequency Distribution\n15. Anomaly Analysis\n16. Correlation Matrix\n17. Exit\nEnter choice (1-17): \n"))
+i = int(input(f"Select summary type:\n1. Head\n2. sample\n3. Columns\n4. Data Types\n5. Info\n6. Index\n7. Describe\n8. Describe All\n9. Size\n10. Shape\n11. Missing Data Analysis\n12. Duplicate Rows\n13. Unique Values per Column\n14. Frequency Distribution\n15. Anomaly Analysis\n16. Correlation Matrix\n17. Memory Usage\n18. Exit\nEnter choice (1-18): \n"))
 while i not in summary_options:
-    i = int(input("Invalid choice. Please enter a number between 1 and 17: \n"))
+    i = int(input("Invalid choice. Please enter a number between 1 and 18: \n"))
         
 summerize_parquet_files(kafka_batches, summary_type= summary_options[i])
 

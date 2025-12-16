@@ -3,52 +3,64 @@ import pyarrow.parquet as pq
 import time
 from pathlib import Path
 
-kafka_batches = [file.name for file in list(Path('../data-generator/output/').glob('kafka_batch_*.parquet'))]
+kafka_batches = [file.name for file in list(Path('./output/').glob('kafka_batch_*.parquet'))]
 
-# Summarize parquet files
-def summerize_parquet_files(kafka_batches, summary_type='head') -> None:
+def summarize_parquet_files(kafka_batches, summary_type='head') -> None:
+    """
+    Explore Parquet files with various summary options
+    
+    Args:
+        kafka_batches: List of Parquet file names
+        summary_type: Type of summary to generate
+    """
+    if summary_type == 'exit':
+        print("Exiting summary tool.")
+        return
+    
     for file in kafka_batches: 
-        df = pd.read_parquet(f'../data-generator/output/{file}')
+        df = pd.read_parquet(f'./output/{file}')
         batch_num = "Batch: " + file[21:27]
         file_count = kafka_batches.index(file) + 1
-        print("="*50)
-        print(f"Batch number {file_count} of {len(kafka_batches)}")
-        # Generate summaries based on user choice
+        
+        print("=" * 70)
+        print(f"Batch {file_count}/{len(kafka_batches)} | {batch_num} | {len(df):,} records")
+        print("=" * 70)
+        
         match summary_type:
             case 'head':
-                print(f"\nSummary of {batch_num}:")
+                print(f"\nFirst 5 rows:")
                 print(df.head())
+            
+            case 'tail':
+                print(f"\nLast 5 rows:")
+                print(df.tail())
+            
             case 'sample':
-                print(f"\nSample of {batch_num}:")
-                print(df.sample())
-            case 'columns':
-                print(f"\nColumns of {batch_num}:")
-                print(df.columns)
+                print(f"\nRandom sample (5 rows):")
+                print(df.sample(min(5, len(df))))
+            
             case 'dtypes':
-                print(f"\nData Types of {batch_num}:")
+                print(f"\nData Types:")
                 print(df.dtypes)
+            
             case 'info':
-                print(f"\nInfo of {batch_num}:")
+                print(f"\nDataFrame Info:")
                 print(df.info())
-                print(f"Total Records: {len(df)}")
-            case 'index':
-                print(f"\nIndex of {batch_num}:")
-                print(df.index)
+                print(f"\nMemory Usage: {df.memory_usage(deep=True).sum() / 1024**2:.2f} MB")
+            
             case 'describe':
-                print(f"\nDescriptive Statistics of {batch_num}:")
+                print(f"\nDescriptive Statistics (Numeric Columns):")
                 print(df.describe())
+            
             case 'describe_all':
                 print(f"\nDescriptive Statistics (All Columns):")
                 print(df.describe(include='all'))
-            case 'size':
-                table = pq.read_table(f'../data-generator/output/{file}')
-                print(f"\nSize of {batch_num}:")
-                print(f"Number of rows: {table.num_rows}")
-                print(f"Number of columns: {table.num_columns}")
-                print(f"Total size (bytes): {table.nbytes}")
+            
             case 'shape':
-                print(f"\nShape of {batch_num}:")
-                print(df.shape)
+                print(f"\nShape: {df.shape[0]:,} rows × {df.shape[1]} columns")
+                print(f"Total elements: {df.size:,}")
+                print(f"Columns: {', '.join(df.columns)}")
+            
             case 'nulls':
                 print(f"\nMissing Data Analysis:")
                 null_counts = df.isnull().sum()
@@ -60,18 +72,19 @@ def summerize_parquet_files(kafka_batches, summary_type='head') -> None:
                 print(null_summary[null_summary['Null_Count'] > 0])
                 if null_counts.sum() == 0:
                     print("No missing values detected!")
+            
             case 'duplicates':
                 dup_count = df.duplicated().sum()
                 print(f"\nDuplicate Rows: {dup_count:,} ({dup_count/len(df)*100:.2f}%)")
                 if 'wafer_id' in df.columns:
                     dup_wafers = df['wafer_id'].duplicated().sum()
                     print(f"Duplicate Wafer IDs: {dup_wafers:,}")
-                    
+            
             case 'unique':
                 print(f"\nUnique Values per Column:")
                 unique_counts = df.nunique()
                 print(unique_counts)
-                
+            
             case 'value_counts':
                 print(f"\nFrequency Distribution:")
                 if 'equipment_id' in df.columns:
@@ -80,7 +93,7 @@ def summerize_parquet_files(kafka_batches, summary_type='head') -> None:
                 if 'is_anomaly' in df.columns:
                     print("\nAnomaly Distribution:")
                     print(df['is_anomaly'].value_counts())
-                    
+            
             case 'anomalies':
                 if 'is_anomaly' in df.columns:
                     anomaly_count = df['is_anomaly'].sum()
@@ -95,7 +108,7 @@ def summerize_parquet_files(kafka_batches, summary_type='head') -> None:
                         print(anomaly_df[['temperature_c', 'pressure_torr', 'yield_rate', 'defect_count']].describe())
                 else:
                     print("No 'is_anomaly' column found")
-                    
+            
             case 'corr':
                 print(f"\nCorrelation Matrix (Numeric Columns):")
                 numeric_cols = df.select_dtypes(include=['float64', 'int64']).columns
@@ -111,36 +124,64 @@ def summerize_parquet_files(kafka_batches, summary_type='head') -> None:
                 }).sort_values('Memory_MB', ascending=False)
                 print(mem_summary)
                 print(f"\nTotal Memory: {mem_mb.sum():.2f} MB")
-                
+            
             case _:
-                print("Exiting summary.")
+                print(f"Invalid summary type: {summary_type}")
+                return
+        
         print("\n")
-        time.sleep(2)  # Pause for readability
         
-summary_options = {
-    1: 'head',
-    2: 'sample',
-    3: 'columns',
-    4: 'dtypes',
-    5: 'info',
-    6: 'index',
-    7: 'describe',
-    8: 'describe_all',
-    9: 'size',
-    10: 'shape',
-    11: 'nulls',
-    12: 'duplicates',
-    13: 'unique',
-    14: 'value_counts',
-    15: 'anomalies',
-    16: 'corr',
-    17: 'memory',
-    18: 'exit'
-}
-        
-i = int(input(f"Select summary type:\n1. Head\n2. sample\n3. Columns\n4. Data Types\n5. Info\n6. Index\n7. Describe\n8. Describe All\n9. Size\n10. Shape\n11. Missing Data Analysis\n12. Duplicate Rows\n13. Unique Values per Column\n14. Frequency Distribution\n15. Anomaly Analysis\n16. Correlation Matrix\n17. Memory Usage\n18. Exit\nEnter choice (1-18): \n"))
-while i not in summary_options:
-    i = int(input("Invalid choice. Please enter a number between 1 and 18: \n"))
-        
-summerize_parquet_files(kafka_batches, summary_type= summary_options[i])
+        # Only pause between batches, not at the end
+        if file_count < len(kafka_batches):
+            time.sleep(1)
 
+# Menu options
+summary_options = {
+    1: ('head', 'First 5 rows'),
+    2: ('tail', 'Last 5 rows'),
+    3: ('sample', 'Random sample'),
+    4: ('dtypes', 'Data types'),
+    5: ('info', 'DataFrame info + memory'),
+    6: ('describe', 'Statistics (numeric only)'),
+    7: ('describe_all', 'Statistics (all columns)'),
+    8: ('shape', 'Shape + column names'),
+    9: ('nulls', 'Missing data analysis'),
+    10: ('duplicates', 'Duplicate row check'),
+    11: ('unique', 'Unique values per column'),
+    12: ('value_counts', 'Frequency distributions'),
+    13: ('anomalies', 'Anomaly analysis'),
+    14: ('corr', 'Correlation matrix'),
+    15: ('memory', 'Memory usage by column'),
+    0: ('exit', 'Exit tool')
+}
+
+print("\n" + "=" * 70)
+print("PARQUET FILE EXPLORATION TOOL")
+print("=" * 70)
+print(f"Found {len(kafka_batches)} Parquet files\n")
+
+# Display menu
+print("Select summary type:")
+for key, (_, description) in sorted(summary_options.items()):
+    print(f"  {key:2d}. {description}")
+
+# Get user input
+while True:
+    try:
+        choice = int(input(f"\nEnter choice (0-{max(summary_options.keys())}): "))
+        if choice in summary_options:
+            break
+        print(f"Invalid choice. Please enter a number between 0 and {max(summary_options.keys())}.")
+    except ValueError:
+        print("Invalid input. Please enter a number.")
+
+summary_type, description = summary_options[choice]
+
+if summary_type == 'exit':
+    print("\nExiting tool.")
+else:
+    print(f"\nGenerating '{description}' summary...\n")
+    summarize_parquet_files(kafka_batches, summary_type=summary_type)
+    print("=" * 70)
+    print("SUMMARY COMPLETE")
+    print("=" * 70)

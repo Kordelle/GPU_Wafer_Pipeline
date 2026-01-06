@@ -660,6 +660,7 @@ This project uses specific technologies for local development and learning purpo
 2024-10-24 15:30:40,127 - __main__ - INFO - Batch size: 1,000,000 | Batches: 10
 2024-10-24 15:30:52,341 - __main__ - INFO - Batch 1: 1,000,000 records | Progress: 10.0% | Rate: 81,300 rec/sec
 2024-10-24 15:31:04,562 - __main__ - INFO - Batch 2: 1,000,000 records | Progress: 20.0% | Rate: 82,150 rec/sec
+2024-10-24 15:31:04,562 - __main__ - INFO - Batch 2: 1,000,000 records | Progress: 30.0% | Rate: 81,750 rec/sec
 ...
 2024-10-24 15:32:18,789 - __main__ - INFO - Generated 10,000,000 records in 98.67s
 2024-10-24 15:32:18,790 - __main__ - INFO -    Average rate: 101,347 records/sec
@@ -668,17 +669,47 @@ This project uses specific technologies for local development and learning purpo
 
 ### Validation Output
 
-```
-VALIDATION SUMMARY
-======================================================================
 Total Validations: 16
 Passed: 16 (100.0%)
 Failed: 0
-======================================================================
 
 All validations passed!
 Pipeline may continue to Gold layer
 ```
+---
+## Technology Decisions
+
+This project uses specific technologies for local development and learning purposes. Here's the rationale and production alternatives:
+
+| Decision | Rationale | Production Alternative |
+|----------|-----------|------------------------|
+| **Docker Compose** | Local dev simplicity, easy multi-service orchestration | **Kubernetes** (AKS/EKS/GKE) for production-grade container orchestration |
+| **MinIO** | S3-compatible API, zero cloud costs, local testing | **AWS S3**, **Azure Blob Storage**, **Google Cloud Storage** |
+| **Kafka (self-hosted)** | Learn end-to-end orchestration, full control | **Confluent Cloud**, **AWS MSK**, **Azure Event Hubs** |
+| **Manual offset commits** | Exactly-once delivery guarantees, data integrity | **Keep in production** (critical for preventing data loss/duplication) |
+| **JSON serialization** | Human-readable debugging, easy inspection | **Avro** (3x compression, schema evolution, type safety) |
+| **Binded Volumes** | Development, Dynamic | **Cloud persistent volumes** (AWS EBS, Azure Disk, GCP Persistent Disk) |
+
+### Why These Choices Matter
+
+**Local Development:**
+- Zero cloud costs during development
+- Easy debugging and troubleshooting
+
+**Production Migration Path:**
+- Each component has a clear cloud-native alternative
+- Architecture patterns remain the same (Kafka → Kafka, S3 → S3)
+- Minimal code changes needed for cloud deployment
+- Skills transfer directly to enterprise environments
+
+### When to Upgrade
+
+| Component | Upgrade Trigger | Why |
+|-----------|----------------|-----|
+| **Docker Compose → Kubernetes** | Need auto-scaling, multi-region, or >10 services | K8s provides orchestration, health checks, rolling updates |
+| **MinIO → Cloud Storage** | Need 99.999% durability, global CDN, or >10TB data | Cloud providers offer built-in replication and disaster recovery |
+| **Self-hosted Kafka → Managed** | Team lacks Kafka ops expertise or need 24/7 uptime | Managed services handle maintenance, upgrades, monitoring |
+| **JSON → Avro** | Storage costs exceed $100/month or schema changes break consumers | Avro reduces storage 3x and provides backward compatibility |
 
 ---
 

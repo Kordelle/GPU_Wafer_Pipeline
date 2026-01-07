@@ -18,6 +18,12 @@ def summerize_parquet_files(kafka_batches, summary_type='head') -> None:
             case 'head':
                 print(f"\nSummary of {batch_num}:")
                 print(df.head())
+            case 'sample':
+                print(f"\nSample of {batch_num}:")
+                print(df.sample())
+            case 'columns':
+                print(f"\nColumns of {batch_num}:")
+                print(df.columns)
             case 'dtypes':
                 print(f"\nData Types of {batch_num}:")
                 print(df.dtypes)
@@ -25,23 +31,65 @@ def summerize_parquet_files(kafka_batches, summary_type='head') -> None:
                 print(f"\nInfo of {batch_num}:")
                 print(df.info())
                 print(f"Total Records: {len(df)}")
+            case 'index':
+                print(f"\nIndex of {batch_num}:")
+                print(df.index)
             case 'describe':
                 print(f"\nDescriptive Statistics of {batch_num}:")
                 print(df.describe())
+            case 'describe_all':
+                print(f"\nDescriptive Statistics (All Columns):")
+                print(df.describe(include='all'))
+            case 'size':
+                table = pq.read_table(f'../data-generator/output/{file}')
+                print(f"\nSize of {batch_num}:")
+                print(f"Number of rows: {table.num_rows}")
+                print(f"Number of columns: {table.num_columns}")
+                print(f"Total size (bytes): {table.nbytes}")
+            case 'shape':
+                print(f"\nShape of {batch_num}:")
+                print(df.shape)
+            case 'nulls':
+                print(f"\nMissing Data Analysis:")
+                null_counts = df.isnull().sum()
+                null_pct = (null_counts / len(df) * 100).round(2)
+                null_summary = pd.DataFrame({
+                    'Null_Count': null_counts,
+                    'Null_Percentage': null_pct
+                })
+                print(null_summary[null_summary['Null_Count'] > 0])
+                if null_counts.sum() == 0:
+                    print("No missing values detected!")
+            case 'duplicates':
+                dup_count = df.duplicated().sum()
+                print(f"\nDuplicate Rows: {dup_count:,} ({dup_count/len(df)*100:.2f}%)")
+                if 'wafer_id' in df.columns:
+                    dup_wafers = df['wafer_id'].duplicated().sum()
+                    print(f"Duplicate Wafer IDs: {dup_wafers:,}")
+            case _:
+                print("Exiting summary.")
         print("\n")
         time.sleep(2)  # Pause for readability
         
 summary_options = {
     1: 'head',
-    2: 'dtypes',
-    3: 'info',
-    4: 'describe'
+    2: 'sample',
+    3: 'columns',
+    4: 'dtypes',
+    5: 'info',
+    6: 'index',
+    7: 'describe',
+    8: 'describe_all',
+    9: 'size',
+    10: 'shape',
+    11: 'nulls',
+    12: 'duplicates',
+    13: 'exit'
 }
         
-i = int(input(f"Select summary type:\n1. Head\n2. Data Types\n3. Info\n4. Describe\nEnter choice (1-4): \n"))
-
+i = int(input(f"Select summary type:\n1. Head\n2. sample\n3. Columns\n4. Data Types\n5. Info\n6. Index\n7. Describe\n8. Describe All\n9. Size\n10. Shape\n11. Missing Data Analysis\n12. Duplicate Rows\n13. Exit\nEnter choice (1-13): \n"))
 while i not in summary_options:
-    i = int(input("Invalid choice. Please enter a number between 1 and 4: \n"))
+    i = int(input("Invalid choice. Please enter a number between 1 and 13: \n"))
         
 summerize_parquet_files(kafka_batches, summary_type= summary_options[i])
 
